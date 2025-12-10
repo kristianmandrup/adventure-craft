@@ -1,5 +1,5 @@
 {
-  "name": "GenCraft AI",
+  "name": "Adventure Craft",
   "description": "A web-based voxel world builder where you use Gemini AI to generate structures, terrain, and creatures simply by describing them.",
   "requestFramePermissions": [
     "microphone"
