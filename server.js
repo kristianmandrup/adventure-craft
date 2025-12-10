@@ -30,6 +30,7 @@ const mimeTypes = {
 };
 
 const server = http.createServer((req, res) => {
+  console.log(`${req.method} ${req.url}`);
   // Normalize URL
   let requestUrl = req.url.split('?')[0];
   
