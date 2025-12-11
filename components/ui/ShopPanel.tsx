@@ -6,8 +6,9 @@ interface ShopItem {
   name: string;
   type: string;
   price: number;
-  icon: React.ReactNode;
-  description: string;
+  icon?: React.ReactNode;
+  description?: string;
+  color?: string;
 }
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -22,14 +23,16 @@ const SHOP_ITEMS: ShopItem[] = [
 
 interface ShopPanelProps {
   playerGold: number;
-  onBuyItem: (type: string, cost: number) => boolean;
+  onBuy: (item: ShopItem) => void; // App.tsx passes entire item or type? App.tsx: onBuy={(item) => ... handleGiveItem(item.type)}
   onClose: () => void;
-  stopProp: (e: any) => void;
-  merchantName: string;
+  merchantName?: string;
+  items?: ShopItem[];
 }
 
-export const ShopPanel: React.FC<ShopPanelProps> = ({ playerGold, onBuyItem, onClose, stopProp, merchantName }) => {
+export const ShopPanel: React.FC<ShopPanelProps> = ({ playerGold, onBuy, onClose, merchantName = 'Merchant', items = SHOP_ITEMS }) => {
   const [message, setMessage] = React.useState<string | null>(null);
+
+  const stopProp = (e: any) => e.stopPropagation();
 
   const handleBuy = (item: ShopItem) => {
     if (playerGold < item.price) {
@@ -38,11 +41,21 @@ export const ShopPanel: React.FC<ShopPanelProps> = ({ playerGold, onBuyItem, onC
       return;
     }
     
-    const success = onBuyItem(item.type, item.price);
-    if (success) {
-      setMessage(`Bought ${item.name}!`);
-      setTimeout(() => setMessage(null), 2000);
-    }
+    // App.tsx uses onBuy(item) then checks gold outside. 
+    // Wait, App.tsx logic: 
+    // onBuy={(item) => { if(playerGold >= item.price) { onGoldGain(-item.price); handleGiveItem(item.type, 1); } }}
+    // So here we should just call onBuy(item).
+    // BUT this component seems to have its own internal check logic?
+    // "const success = onBuyItem(item.type, item.price)"
+    
+    // Let's defer to the prop. If the prop handles the transaction, we just call it.
+    // However, for UI feedback (setMessage), we might need to know if it succeeded.
+    // App.tsx implementation simply does it.
+    
+    // Let's trust the prop to do the work.
+    onBuy(item);
+    setMessage(`Bought ${item.name}!`);
+    setTimeout(() => setMessage(null), 2000);
   };
 
   return (
@@ -81,7 +94,7 @@ export const ShopPanel: React.FC<ShopPanelProps> = ({ playerGold, onBuyItem, onC
 
         {/* Items Grid */}
         <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto pr-2">
-          {SHOP_ITEMS.map(item => (
+          {items.map(item => (
             <div 
               key={item.id}
               className={`bg-black/30 rounded-xl p-3 flex items-center gap-4 border transition-all ${
@@ -92,11 +105,17 @@ export const ShopPanel: React.FC<ShopPanelProps> = ({ playerGold, onBuyItem, onC
               onClick={() => handleBuy(item)}
             >
               <div className="w-10 h-10 bg-amber-800/50 rounded-lg flex items-center justify-center text-amber-300">
-                {item.icon}
+                {/* 
+                   Dynamic icon support is tricky if passed from App.tsx as plain objects.
+                   App.tsx passes: { id: '1', name: 'Sword', type: 'weapon', price: 50, color: '#06b6d4' }
+                   It does NOT pass 'icon' ReactNode.
+                   We need a fallback logic for icons. 
+                */}
+                {item.icon ? item.icon : <CircleDot size={20} />}
               </div>
               <div className="flex-1">
                 <div className="font-bold text-white">{item.name}</div>
-                <div className="text-sm text-amber-300/80">{item.description}</div>
+                <div className="text-sm text-amber-300/80">{item.description || 'Rare item'}</div>
               </div>
               <div className="flex items-center gap-1 text-yellow-400 font-bold">
                 <Coins size={14} />

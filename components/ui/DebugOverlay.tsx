@@ -12,6 +12,7 @@ export interface DebugInfo {
   pitch: number;
   yaw: number;
   mode?: string;
+  viewMode?: string;
 }
 
 export interface DebugOverlayRef {
@@ -37,7 +38,8 @@ export const DebugOverlay = forwardRef<DebugOverlayRef, {}>((props, ref) => {
         <div>STATUS: {info.locked ? 'LOCKED' : 'UNLOCKED'}</div>
         <div>DIR: {info.direction} ({info.heading}°)</div>
         <div>SPEED: {info.speed.toFixed(1)}</div>
-        <div className="text-[10px] text-blue-300">MODE: {info.mode}</div>
+        <div className="text-[10px] text-blue-300">PHYSICS: {info.mode}</div>
+        <div className="text-[10px] text-purple-300">VIEW: {info.viewMode || 'FP'}</div>
         <div>STATE: {info.speed > 10.5 ? 'SPRINTING' : info.moving ? 'WALKING' : 'IDLE'}</div>
         <div className="mt-1 font-bold text-yellow-400">LAST KEY: {info.lastKey}</div>
         <div className="text-yellow-400">DURATION: {info.keyDuration}</div>

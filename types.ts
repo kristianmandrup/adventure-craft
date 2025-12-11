@@ -38,6 +38,7 @@ export interface Character {
   isMoving?: boolean; // For animation
   lastAttackTime?: number;
   wanderTarget?: THREE.Vector3 | null; // For idle AI
+  hasSummoned?: boolean; // For Sorcerer
 }
 
 export interface Projectile {
@@ -110,3 +111,15 @@ export interface SpawnMarker {
   z: number;
   timestamp: number;
 }
+
+export interface DroppedItem {
+  id: string;
+  type: string;
+  position: THREE.Vector3;
+  count: number;
+  color: string;
+  velocity: THREE.Vector3; // For bouncing animation
+  createdAt: number;
+}
+
+export type NotificationType = 'BOSS' | 'MERCHANT' | 'INFO' | 'COMBAT_HIT' | 'COMBAT_MISS' | 'COMBAT_BLOCK' | 'COMBAT_DAMAGE' | 'WARNING';

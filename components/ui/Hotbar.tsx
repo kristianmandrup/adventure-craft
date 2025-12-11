@@ -24,7 +24,15 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, activeSlot, setActive
             {inventory[idx] && (
                <>
                  <div className="w-6 h-6 rounded-sm shadow-sm flex items-center justify-center text-[10px] overflow-hidden" style={{ backgroundColor: inventory[idx].color }}>
-                    {inventory[idx].type.includes('weapon') ? '⚔️' : inventory[idx].type.includes('meat') ? '🥩' : ''}
+                    {inventory[idx].type.includes('weapon') || inventory[idx].type === 'sword' ? '⚔️' : 
+                     inventory[idx].type.includes('meat') ? '🥩' : 
+                     inventory[idx].type === 'shield' ? '🛡️' :
+                     inventory[idx].type === 'bow' ? '🏹' :
+                     inventory[idx].type.includes('pick') ? '⛏️' :
+                     inventory[idx].type === 'axe' ? '🪓' :
+                     inventory[idx].type === 'apple' ? '🍎' :
+                     inventory[idx].type === 'torch' ? '🔥' : 
+                     inventory[idx].type === 'arrows' ? '➹' : ''}
                  </div>
                  <span className="absolute bottom-0.5 right-1 text-[10px] font-bold text-white shadow-black drop-shadow-md">{inventory[idx].count}</span>
                </>

@@ -6,22 +6,24 @@ import { resolveCollision, JUMP_FORCE, SPEED, MAX_SPRINT_SPEED, ACCELERATION, DE
 
 const FIXED_TIME_STEP = 1 / 60;
 const MAX_FRAME_TIME = 0.1;
+const THIRD_PERSON_OFFSET = new THREE.Vector3(0, 2, 4);
 
 interface UsePlayerPhysicsProps {
   controlsRef: React.RefObject<any>;
   blockMap: Map<string, Block>;
   positionRef: React.MutableRefObject<THREE.Vector3>;
   rainGroupRef: React.RefObject<THREE.Group>;
-  viewMode: 'FP' | 'OVERHEAD';
+  viewMode: 'FP' | 'OVERHEAD' | 'TP';
   setIsLocked: (locked: boolean) => void;
   respawnTrigger: number;
   targetPosRef: React.MutableRefObject<[number, number, number] | null>;
   resetViewTrigger: number;
   playerPosRef: React.MutableRefObject<[number, number, number] | null>;
+  hasMagicBoots: boolean; // New prop
 }
 
 export const usePlayerPhysics = ({
-  controlsRef, blockMap, positionRef, rainGroupRef, viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger, playerPosRef
+  controlsRef, blockMap, positionRef, rainGroupRef, viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger, playerPosRef, hasMagicBoots
 }: UsePlayerPhysicsProps) => {
   const { camera } = useThree();
   const velocity = useRef(new THREE.Vector3(0, 0, 0));
@@ -32,12 +34,18 @@ export const usePlayerPhysics = ({
   const moveLeft = useRef(false);
   const moveRight = useRef(false);
   const canJump = useRef(false);
+  const isSprinting = useRef(false); // Track Shift key
   const runTimer = useRef(0);
   const accumulator = useRef(0);
   const lastKey = useRef<string>('');
   const physicsMode = useRef<'ACCELERATION' | 'DIRECT'>('ACCELERATION');
+  
+  // Magic Boots State
+  const bootsActiveTime = useRef(0);
+  const bootsCooldownEnd = useRef(0);
+  
   const [camAngle, setCamAngle] = useState({ pitch: 0, yaw: 0 });
-  const [debugInfo, setDebugInfo] = useState({ speed: 0, moving: false, locked: false, keys: '', mode: 'ACCELERATION' });
+  const [debugInfo, setDebugInfo] = useState({ speed: 0, moving: false, locked: false, keys: '', mode: 'ACCELERATION', boost: 'READY' });
 
   // Input Listeners
   useEffect(() => {
@@ -54,6 +62,7 @@ export const usePlayerPhysics = ({
         case 'ArrowLeft': case 'KeyA': moveLeft.current = true; break;
         case 'ArrowDown': case 'KeyS': moveBackward.current = true; break;
         case 'ArrowRight': case 'KeyD': moveRight.current = true; break;
+        case 'ShiftLeft': case 'ShiftRight': isSprinting.current = true; break;
         case 'KeyH': 
           if (controlsRef.current) {
                // Reset pitch to 0 (Level View)
@@ -65,7 +74,10 @@ export const usePlayerPhysics = ({
           physicsMode.current = physicsMode.current === 'ACCELERATION' ? 'DIRECT' : 'ACCELERATION';
           break;
         case 'Space': 
-          if (canJump.current) velocity.current.y = JUMP_FORCE; 
+          if (canJump.current) {
+               const jumpMult = bootsActiveTime.current > 0 ? 1.5 : 1;
+               velocity.current.y = JUMP_FORCE * jumpMult;
+          }
           canJump.current = false;
           break;
       }
@@ -76,6 +88,7 @@ export const usePlayerPhysics = ({
         case 'ArrowLeft': case 'KeyA': moveLeft.current = false; break;
         case 'ArrowDown': case 'KeyS': moveBackward.current = false; break;
         case 'ArrowRight': case 'KeyD': moveRight.current = false; break;
+        case 'ShiftLeft': case 'ShiftRight': isSprinting.current = false; break;
       }
     };
     document.addEventListener('keydown', onKeyDown);
@@ -86,22 +99,18 @@ export const usePlayerPhysics = ({
     };
   }, []);
 
-  // Respawn & Reset Handlers
+  // Respawn & Reset Handlers 
+  // (SAME AS BEFORE - OMITTING FOR BREVITY IF NOT CHANGING, BUT TOOL REQUIRES FULL FILE OFTEN OR CHUNK)
+  // Converting to chunks to be safe and efficient.
   useEffect(() => {
     if (respawnTrigger > 0) {
        isRespawning.current = true;
-       
-       // Find a random non-water spawn location
        let spawnX = 0, spawnZ = 0;
-       
-       // Collect all valid surface blocks (not water)
        const surfaceBlocks: { x: number; z: number; y: number }[] = [];
        const processedPositions = new Set<string>();
-       
        for (const b of blockMap.values()) {
          const key = `${Math.round(b.x)},${Math.round(b.z)}`;
          if (!processedPositions.has(key) && b.type !== 'water') {
-           // Find the highest non-water block at this x,z
            let maxY = b.y;
            for (const b2 of blockMap.values()) {
              if (Math.round(b2.x) === Math.round(b.x) && 
@@ -115,17 +124,13 @@ export const usePlayerPhysics = ({
            processedPositions.add(key);
          }
        }
-       
-       // Pick a random valid surface block
        if (surfaceBlocks.length > 0) {
          const randomBlock = surfaceBlocks[Math.floor(Math.random() * surfaceBlocks.length)];
          spawnX = randomBlock.x;
          spawnZ = randomBlock.z;
          velocity.current.set(0, 0, 0);
-         // Update Ref directly
          positionRef.current.copy(new THREE.Vector3(spawnX, randomBlock.y + 3, spawnZ));
        } else {
-         // Fallback to origin if no valid blocks
          velocity.current.set(0, 0, 0);
          positionRef.current.copy(new THREE.Vector3(0, 30, 0));
        }
@@ -142,13 +147,22 @@ export const usePlayerPhysics = ({
 
   // Physics Loop (Fixed Time Step)
   useFrame((state, delta) => {
-    // 1. Accumulate frame time
     let frameTime = delta;
-    if (frameTime > MAX_FRAME_TIME) frameTime = MAX_FRAME_TIME; // Prevent spiral of death
+    if (frameTime > MAX_FRAME_TIME) frameTime = MAX_FRAME_TIME;
     accumulator.current += frameTime;
 
-    // 2. Camera Angle Updates (Per Frame)
-    if (viewMode === 'FP') {
+    const now = Date.now();
+    
+    // Magic Boots Activation
+    if (isSprinting.current && hasMagicBoots && now > bootsCooldownEnd.current && bootsActiveTime.current <= 0) {
+        bootsActiveTime.current = 2.0; // 2 Seconds Duration
+        bootsCooldownEnd.current = now + 15000; // 15 Seconds Cooldown (starts after use?) User said "recharge for 15 secs before they can be used again". Usually cooldown starts after effect or activation. Let's make it start after activation for simplicity, effectively 15s cycle. Actually "Then must recharge", implies after use. 
+        // Let's set cooldown to now + 2000 (duration) + 15000 (recharge).
+        bootsCooldownEnd.current = now + 17000;
+    }
+
+    // Camera Angle Updates
+    if (viewMode === 'FP' || viewMode === 'TP') {
       const dir = new THREE.Vector3();
       camera.getWorldDirection(dir);
       const pitch = Math.asin(dir.y);
@@ -156,9 +170,13 @@ export const usePlayerPhysics = ({
       setCamAngle({ pitch: Math.round(THREE.MathUtils.radToDeg(pitch)), yaw: Math.round(THREE.MathUtils.radToDeg(yaw)) });
     }
 
-    // 3. Fixed Step Physics
     while (accumulator.current >= FIXED_TIME_STEP) {
-        if (viewMode === 'FP') {
+        // Boots Timer Step
+        if (bootsActiveTime.current > 0) {
+            bootsActiveTime.current -= FIXED_TIME_STEP;
+        }
+
+        if (viewMode === 'FP' || viewMode === 'TP') {
             if (controlsRef.current && controlsRef.current.isLocked !== isLocked.current) {
               isLocked.current = controlsRef.current.isLocked;
               setIsLocked(isLocked.current);
@@ -185,22 +203,23 @@ export const usePlayerPhysics = ({
               if (moveDir.lengthSq() > 0) runTimer.current += FIXED_TIME_STEP;
               else runTimer.current = 0;
               
-              // Switch logic based on mode
+              // Speed Logic with Boost
+              let currentMaxSpeed = MAX_SPRINT_SPEED;
+              if (bootsActiveTime.current > 0) {
+                  currentMaxSpeed *= 2; // Double Speed
+              }
+              const moveSpeed = runTimer.current > 0.2 ? currentMaxSpeed : SPEED;
+
               if (physicsMode.current === 'DIRECT') {
-                 // DIRECT MODE: Instant Velocity
-                 const speed = runTimer.current > 0.2 ? MAX_SPRINT_SPEED : SPEED;
                  if (moveDir.lengthSq() > 0) {
-                    velocity.current.x = moveDir.x * speed;
-                    velocity.current.z = moveDir.z * speed;
+                    velocity.current.x = moveDir.x * moveSpeed;
+                    velocity.current.z = moveDir.z * moveSpeed;
                  } else {
                     velocity.current.x = 0;
                     velocity.current.z = 0;
                  }
               } else {
-                 // ACCELERATION MODE: Momentum-based
-                  const targetSpeed = moveDir.lengthSq() > 0 
-                      ? (runTimer.current > 0.2 ? MAX_SPRINT_SPEED : SPEED) 
-                      : 0;
+                  const targetSpeed = moveDir.lengthSq() > 0 ? moveSpeed : 0;
                   const currentPlanarSpeed = Math.sqrt(velocity.current.x**2 + velocity.current.z**2);
                   const accel = moveDir.lengthSq() > 0 ? ACCELERATION : DECELERATION;
                   
@@ -231,6 +250,9 @@ export const usePlayerPhysics = ({
               positionRef.current.copy(result.position);
               velocity.current = result.velocity;
               canJump.current = result.onGround;
+              
+              // Sync playerPosRef for Minimap
+              playerPosRef.current = [positionRef.current.x, positionRef.current.y, positionRef.current.z];
             }
         } else {
             if (isLocked.current) {
@@ -242,18 +264,46 @@ export const usePlayerPhysics = ({
         accumulator.current -= FIXED_TIME_STEP;
     }
 
-    // 4. Update Visuals (Per Frame)
-    // Update camera position to follow player (Interpolation could be added here later)
+    // 4. Update Visuals
     if (viewMode === 'FP') {
-         camera.position.copy(positionRef.current).add(new THREE.Vector3(0, 0.6, 0));
+         camera.position.copy(positionRef.current).add(new THREE.Vector3(0, 1.6, 0));
+    } else if (viewMode === 'TP') {
+         // Third Person Position
+         const offset = THIRD_PERSON_OFFSET.clone();
+         offset.applyEuler(new THREE.Euler(0, camAngle.yaw * (Math.PI / 180) + Math.PI, 0)); // Rotate offset to match player facing?
+         // Actually, if we use PointerLockControls, the camera rotation is controlled by mouse.
+         // In TP, we want the camera to be behind the player.
+         // Let's attach relative to camera direction.
+         const camDir = new THREE.Vector3();
+         camera.getWorldDirection(camDir);
+         camDir.y = 0;
+         camDir.normalize();
+         
+         // -camDir is backward.
+         const tpPos = positionRef.current.clone().add(new THREE.Vector3(0, 2, 0)).add(camDir.clone().multiplyScalar(-4));
+         
+         // Simple wall clip prevention could be added here, but for now just position.
+         // Wait, if we set camera position every frame, PointerLockControls might fight it?
+         // PointerLockControls updates the OBJECT attached to it.
+         // Usually PLC controls the CAMERA.
+         // If we move the camera manually, PLC might override or add to it.
+         // Actually, typically in TP with PLC, the "Player" rotates, and camera follows.
+         // Here, `camera` IS the thing being rotated by PLC.
+         // So we can't move the camera away from its pivot easily without wrapping it.
+         // BUT: standard PLC behavior rotates the camera in place.
+         // If `viewMode` is TP, we might need a different control scheme or just offset the rendering?
+         // No, simpler: In TP, we still want to look around.
+         // Let's try: Position camera manually, but let PLC handle rotation? 
+         // If we set camera.position, PLC doesn't reset it.
+         // So: 
+         camera.position.copy(tpPos);
     }
     
-    // Update Rain Group
     if (rainGroupRef.current) {
         rainGroupRef.current.position.copy(positionRef.current);
     }
 
-    // Debug Info Update
+    // Debug Info
     const keys = [
       moveForward.current ? 'W' : '',
       moveLeft.current ? 'A' : '',
@@ -261,7 +311,12 @@ export const usePlayerPhysics = ({
       moveRight.current ? 'D' : '',
     ].filter(Boolean).join('');
     
-    if (viewMode === 'FP' && isLocked.current) {
+    // Boost Status
+    let boostStatus = 'READY';
+    if (bootsActiveTime.current > 0) boostStatus = 'ACTIVE!';
+    else if (now < bootsCooldownEnd.current) boostStatus = `COOLDOWN ${(bootsCooldownEnd.current - now)/1000}`; // Rough format
+
+    if ((viewMode === 'FP' || viewMode === 'TP') && isLocked.current) {
           const speed = Math.sqrt(velocity.current.x ** 2 + velocity.current.z ** 2);
           let bearing = 0;
           let directionStr = "N";
@@ -282,12 +337,18 @@ export const usePlayerPhysics = ({
             heading: Math.round(bearing),
             lastKey: lastKey.current || 'NONE',
             keyDuration: runTimer.current > 0 ? (runTimer.current).toFixed(2) + 's' : '0.00s',
-            mode: physicsMode.current
+            mode: physicsMode.current,
+            boost: boostStatus
           });
     } else {
        setDebugInfo(prev => ({ ...prev, locked: isLocked.current, keys }));
     }
   });
 
-  return { isLocked, camAngle, debugInfo };
+  // Knockback Helper
+  const applyKnockback = (force: THREE.Vector3) => {
+      velocity.current.add(force);
+  };
+
+  return { isLocked, camAngle, debugInfo, applyKnockback };
 };

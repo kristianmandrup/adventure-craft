@@ -4,6 +4,13 @@ import { GenerationResponse, CharacterGenerationResponse, ChatMessage, ItemGener
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+const selectModel = () => {
+    const r = Math.random();
+    if (r < 0.3) return "gemini-flash-2.5";
+    if (r < 0.7) return "gemini-2.5-pro"; // 0.3 + 0.4
+    return "gemini-3.0-preview";
+};
+
 // --- Schemas ---
 
 const blockSchema = {
@@ -89,7 +96,7 @@ export const generateStructure = async (
 ): Promise<GenerationResponse> => {
   
   // Switched to Flash for better quota management
-  const modelId = "gemini-2.5-flash"; 
+  const modelId = selectModel(); 
   const isTower = prompt.toLowerCase().includes('tower');
 
   const systemInstruction = `
@@ -133,7 +140,7 @@ export const generateStructure = async (
 };
 
 export const generateCharacter = async (prompt: string): Promise<CharacterGenerationResponse> => {
-  const modelId = "gemini-2.5-flash"; // Switched to Flash
+  const modelId = selectModel();
 
   const systemInstruction = `
     You are a Voxel Character Designer.
@@ -174,7 +181,7 @@ export const generateCharacter = async (prompt: string): Promise<CharacterGenera
 };
 
 export const generateItem = async (prompt: string): Promise<ItemGenerationResponse> => {
-  const modelId = "gemini-2.5-flash";
+  const modelId = selectModel();
 
   try {
     const response = await ai.models.generateContent({
@@ -196,7 +203,7 @@ export const generateItem = async (prompt: string): Promise<ItemGenerationRespon
 };
 
 export const generateDialogue = async (npcName: string, playerMessage: string, history: ChatMessage[]) => {
-  const modelId = "gemini-2.5-flash"; // Fast model for chat
+  const modelId = selectModel(); // Fast model for chat
   
   const conversation = history.map(h => `${h.sender}: ${h.text}`).join('\n');
   const context = `You are playing the role of ${npcName} in a fantasy voxel RPG. 

@@ -9,9 +9,10 @@ interface UseMinimapProps {
   blocks: Block[];
   filter: FilterType;
   spawnMarkers: SpawnMarker[];
+  portalPosition?: [number, number, number] | null;
 }
 
-export const useMinimap = ({ playerPosRef, characters, blocks, filter, spawnMarkers }: UseMinimapProps) => {
+export const useMinimap = ({ playerPosRef, characters, blocks, filter, spawnMarkers, portalPosition }: UseMinimapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [identifiedEntity, setIdentifiedEntity] = useState<string | null>(null);
 
@@ -137,6 +138,30 @@ export const useMinimap = ({ playerPosRef, characters, blocks, filter, spawnMark
              }
           }
       });
+
+      // Portal Marker
+      if (portalPosition) {
+           const dx = portalPosition[0] - px;
+           const dz = portalPosition[2] - pz;
+           if (Math.abs(dx) < range && Math.abs(dz) < range) {
+               const cx = center + dx * scale;
+               const cy = center + dz * scale;
+               
+               // Core
+               ctx.fillStyle = '#a855f7'; // Purple-500
+               ctx.beginPath();
+               ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+               ctx.fill();
+               
+               // Pulse ring
+               const pulse = (Math.sin(Date.now() * 0.005) + 1) / 2;
+               ctx.strokeStyle = `rgba(168, 85, 247, ${pulse})`;
+               ctx.lineWidth = 1;
+               ctx.beginPath();
+               ctx.arc(cx, cy, 6 + pulse * 2, 0, Math.PI * 2);
+               ctx.stroke();
+           }
+      }
 
       // Player
       ctx.save();

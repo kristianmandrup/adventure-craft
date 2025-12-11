@@ -4,7 +4,7 @@ import { Wand2, Heart, Beef, Compass, Eye, Map as MapIcon, RotateCcw, Trash2, Ha
 interface TopBarProps {
   playerHp: number;
   playerHunger: number;
-  viewMode: 'FP' | 'OVERHEAD';
+  viewMode: 'FP' | 'OVERHEAD' | 'TP';
   expansionLevel: number;
   onResetView: () => void;
   onExpand: () => void;
@@ -109,6 +109,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onMouseLeave={hideTooltip}
           >
             <Compass className="w-5 h-5 text-cyan-400" />
+            <span className="ml-2 text-sm font-bold max-md:hidden">Level (H)</span>
           </button>
            <div className="bg-black/50 p-3 rounded-lg flex items-center gap-2 text-white border border-white/10" title="Current View Mode">
               <Eye className="w-5 h-5 text-blue-400" />

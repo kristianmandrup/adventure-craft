@@ -2,16 +2,44 @@ import React, { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Stars, Cloud, PointerLockControls, Sky, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { Block, Character, Projectile, InventoryItem } from '../types';
+import { Block, Character, Projectile, InventoryItem, DroppedItem } from '../types';
 import { TextureData } from '../utils/textures';
 import { createBlockMap } from '../utils/physics';
 
 import { Cube } from './Cube';
 import { ProjectileMesh } from './ProjectileMesh';
+import { ItemDrop } from './ItemDrop';
 import { AnimatedCharacter } from './AnimatedCharacter';
 import { WorldController } from './WorldController';
-import { RainSystem } from './environment/RainSystem';
 import { useRainAudio } from '../hooks/useRainAudio';
+
+// Rain System Component
+const RainSystem = () => {
+  const rainCount = 1000;
+  const positions = useMemo(() => {
+    const pos = new Float32Array(rainCount * 3);
+    for (let i = 0; i < rainCount; i++) {
+        pos[i*3] = (Math.random() - 0.5) * 50;
+        pos[i*3+1] = Math.random() * 40;
+        pos[i*3+2] = (Math.random() - 0.5) * 50;
+    }
+    return pos;
+  }, []);
+  
+  return (
+    <points>
+        <bufferGeometry>
+            <bufferAttribute 
+                attach="attributes-position" 
+                count={rainCount} 
+                itemSize={3} 
+                array={positions} 
+            />
+        </bufferGeometry>
+        <pointsMaterial color="#aaaaaa" size={0.1} transparent opacity={0.6} />
+    </points>
+  );
+};
 
 interface VoxelWorldProps {
   blocks: Block[];
@@ -31,8 +59,8 @@ interface VoxelWorldProps {
   setInventory: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
   activeSlot: number;
   respawnTrigger: number;
-  viewMode: 'FP' | 'OVERHEAD';
-  setViewMode: (mode: 'FP' | 'OVERHEAD') => void;
+  viewMode: 'FP' | 'OVERHEAD' | 'TP';
+  setViewMode: (mode: 'FP' | 'OVERHEAD' | 'TP') => void;
   targetPosRef: React.MutableRefObject<[number, number, number] | null>;
   resetViewTrigger: number;
   playerPosRef: React.MutableRefObject<[number, number, number] | null>;
@@ -42,15 +70,16 @@ interface VoxelWorldProps {
   onXpGain: (amount: number) => void;
   onGoldGain: (amount: number) => void;
   onDebugUpdate?: (info: any) => void;
+  droppedItems: DroppedItem[];
+  setDroppedItems: React.Dispatch<React.SetStateAction<DroppedItem[]>>;
+  onNotification: (message: string, type: 'info' | 'success' | 'warning' | 'error', subMessage?: string) => void;
 }
 
-export const VoxelWorld: React.FC<VoxelWorldProps> = ({
-  blocks, characters, onDayChange, isDay, isRaining, setBlocks, setCharacters,
-  projectiles, setProjectiles,
-  playerHp, setPlayerHp, playerHunger, setPlayerHunger,
-  inventory, setInventory, activeSlot, respawnTrigger,
-  viewMode, setViewMode, targetPosRef, resetViewTrigger, playerPosRef, onCharacterInteract, onQuestUpdate,
-  playerStats, onXpGain, onGoldGain, onDebugUpdate
+export const VoxelWorld: React.FC<VoxelWorldProps> = ({ 
+  blocks, setBlocks, characters, setCharacters, projectiles, setProjectiles, onDayChange, isDay, isRaining,
+  setInventory, inventory, activeSlot, setPlayerHunger, setPlayerHp, respawnTrigger, viewMode, setViewMode,
+  targetPosRef, resetViewTrigger, playerPosRef, onQuestUpdate, playerStats, onXpGain, onGoldGain, onDebugUpdate,
+  droppedItems, setDroppedItems, onNotification, playerHp, playerHunger, onCharacterInteract
 }) => {
   const positionRef = React.useRef<THREE.Vector3>(new THREE.Vector3(0, 10, 0));
   const rainGroupRef = React.useRef<THREE.Group>(null);
@@ -102,11 +131,11 @@ export const VoxelWorld: React.FC<VoxelWorldProps> = ({
          </group>
        )}
        
-       <Cloud opacity={isRaining ? 0.8 : 0.5} speed={0.01} bounds={[10, 2, 10]} segments={20} position={[0, 25, 0]} color={isRaining ? '#555555' : 'white'}/>
+
 
        {isRaining && <group ref={rainGroupRef}><RainSystem /></group>}
 
-       {viewMode === 'FP' ? (
+       {viewMode === 'FP' || viewMode === 'TP' ? (
            <PointerLockControls 
               ref={controlsRef} 
               minPolarAngle={Math.PI / 4} 
@@ -143,6 +172,11 @@ export const VoxelWorld: React.FC<VoxelWorldProps> = ({
          onXpGain={onXpGain}
          onGoldGain={onGoldGain}
          onDebugUpdate={onDebugUpdate}
+         droppedItems={droppedItems}
+         setDroppedItems={setDroppedItems}
+         onNotification={onNotification}
+         playerHp={playerHp}
+         playerHunger={playerHunger}
        />
 
        {blocks.map(block => (
@@ -158,6 +192,10 @@ export const VoxelWorld: React.FC<VoxelWorldProps> = ({
 
        {projectiles.map(p => (
          <ProjectileMesh key={p.id} projectile={p} />
+       ))}
+        
+       {droppedItems.map(item => (
+         <ItemDrop key={item.id} item={item} />
        ))}
 
        {characters.map(char => (

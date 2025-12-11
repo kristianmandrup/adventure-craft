@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useUIState } from '../hooks/useUIState';
 import { GenerationMode, Job, InventoryItem, Quest } from '../types';
+import { CharacterPrefab } from '../utils/prefabs/characters';
+import { StructurePrefab } from '../utils/prefabs/structures';
 import { TopBar } from './ui/TopBar';
 import { Hotbar } from './ui/Hotbar';
 import { SpawnMenu } from './ui/SpawnMenu';
@@ -7,8 +9,6 @@ import { GenerationInput } from './ui/GenerationInput';
 import { CraftingMenu } from './ui/CraftingMenu';
 import { JobQueue } from './ui/JobQueue';
 import { QuestDisplay } from './ui/QuestDisplay';
-import { CharacterPrefab } from '../utils/prefabs/characters';
-import { StructurePrefab } from '../utils/prefabs/structures';
 
 interface UIOverlayProps {
   onGenerate: (type: GenerationMode, prompt: string, count: number, isEnemy?: boolean, isGiant?: boolean, isFriendly?: boolean, isAquatic?: boolean) => void;
@@ -28,7 +28,7 @@ interface UIOverlayProps {
   setActiveSlot: (slot: number) => void;
   onCraft: (recipeId: string) => void;
   expansionLevel: number;
-  viewMode?: 'FP' | 'OVERHEAD';
+  viewMode?: 'FP' | 'OVERHEAD' | 'TP';
   quest: Quest | null;
   questMessage: string | null;
   playerXp: number;
@@ -39,52 +39,24 @@ interface UIOverlayProps {
   hasApiKey: boolean;
 }
 
+
 export const UIOverlay: React.FC<UIOverlayProps> = ({ 
   onGenerate, onSpawnPredefinedCharacter, onSpawnPredefinedStructure, onReset, onExpand, onShrink, onGiveItem, onRespawn, onResetView, jobs, playerHp, playerHunger, inventory, activeSlot, setActiveSlot, onCraft, expansionLevel, viewMode = 'FP', quest, questMessage,
   playerXp, playerLevel, xpThresholds, levelUpMessage, playerGold, hasApiKey
 }) => {
-  const [showCrafting, setShowCrafting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [tooltip, setTooltip] = useState<{text: string, x: number, y: number} | null>(null);
-  
-  // Hoisted state for shared count control
-  const [generationCount, setGenerationCount] = useState(1);
+  const {
+      showCrafting,
+      setShowCrafting,
+      toggleCrafting,
+      tooltip,
+      showTooltip,
+      hideTooltip,
+      generationCount,
+      setGenerationCount,
+      inputRef,
+      stopProp
+  } = useUIState({ onReset, onRespawn, onExpand, onResetView, setActiveSlot });
 
-  const showTooltip = (e: React.MouseEvent, text: string) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setTooltip({ text, x: rect.left + rect.width / 2, y: rect.top - 8 });
-  };
-  const hideTooltip = () => setTooltip(null);
-  
-  const stopProp = (e: React.PointerEvent | React.MouseEvent) => {
-      e.stopPropagation();
-      e.nativeEvent.stopImmediatePropagation();
-  };
-
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const isInputFocused = document.activeElement === inputRef.current;
-      if (e.key === 'Enter') {
-        if (!isInputFocused) {
-           if (document.pointerLockElement) document.exitPointerLock();
-           setTimeout(() => inputRef.current?.focus(), 10);
-           e.preventDefault();
-        }
-        return;
-      }
-      if (isInputFocused) return;
-      if (['1','2','3','4','5'].includes(e.key)) setActiveSlot(parseInt(e.key) - 1);
-      switch(e.key.toLowerCase()) {
-        case 'n': onReset(); break;
-        case 'r': onRespawn(); break;
-        case 'm': onExpand(); break;
-        case 'h': onResetView(); break;
-        case 'c': setShowCrafting(prev => !prev); break;
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [onReset, onRespawn, onExpand, onResetView, setActiveSlot]);
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
@@ -129,7 +101,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
         onShrink={onShrink}
         onRespawn={onRespawn}
         onReset={onReset}
-        onToggleCrafting={() => setShowCrafting(!showCrafting)}
+        onToggleCrafting={toggleCrafting}
         stopProp={stopProp}
         showTooltip={showTooltip}
         hideTooltip={hideTooltip}

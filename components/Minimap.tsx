@@ -7,12 +7,13 @@ interface MinimapProps {
   characters: Character[];
   blocks: Block[];
   spawnMarkers?: SpawnMarker[];
+  portalPosition?: [number, number, number] | null;
 }
 
-export const Minimap: React.FC<MinimapProps> = ({ playerPosRef, characters, blocks, spawnMarkers = [] }) => {
+export const Minimap: React.FC<MinimapProps> = ({ playerPosRef, characters, blocks, spawnMarkers = [], portalPosition }) => {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const { canvasRef, identifiedEntity, handleCanvasClick } = useMinimap({ 
-      playerPosRef, characters, blocks, filter, spawnMarkers
+      playerPosRef, characters, blocks, filter, spawnMarkers, portalPosition
   });
 
   const stopProp = (e: React.PointerEvent | React.MouseEvent) => {

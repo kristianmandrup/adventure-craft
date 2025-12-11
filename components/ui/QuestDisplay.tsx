@@ -18,8 +18,8 @@ export const QuestDisplay: React.FC<QuestDisplayProps> = ({ quest, questMessage 
 
   if (questMessage) {
       return (
-          <div className={`fixed top-1/4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 transform ${animate ? 'scale-110 opacity-100' : 'scale-90 opacity-0'}`}>
-             <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-8 py-4 rounded-xl shadow-2xl border-4 border-yellow-300 flex flex-col items-center">
+          <div className={`fixed top-1/4 left-1/2 -translate-x-1/2 z-100 transition-all duration-500 transform ${animate ? 'scale-110 opacity-100' : 'scale-90 opacity-0'}`}>
+             <div className="bg-linear-gradient-to-r from-yellow-500 to-amber-600 text-white px-8 py-4 rounded-xl shadow-2xl border-4 border-yellow-300 flex flex-col items-center">
                 <CheckCircle2 className="w-12 h-12 mb-2 text-yellow-100" />
                 <h2 className="text-3xl font-black uppercase tracking-wider drop-shadow-md">Quest Complete!</h2>
              </div>

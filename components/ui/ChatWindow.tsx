@@ -3,14 +3,18 @@ import { X, Send } from 'lucide-react';
 import { ChatMessage } from '../../types';
 
 interface ChatWindowProps {
+  npcId?: string; // Added for compatibility
   npcName: string;
   history: ChatMessage[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string) => void | Promise<void>;
   onClose: () => void;
-  stopProp: (e: any) => void;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ npcName, history, onSendMessage, onClose, stopProp }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ npcName, history, onSendMessage, onClose }) => {
+  const stopProp = (e: any) => {
+      e.stopPropagation();
+      e.nativeEvent?.stopImmediatePropagation?.();
+  };
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
