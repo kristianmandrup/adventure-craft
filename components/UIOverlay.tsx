@@ -7,11 +7,16 @@ import { GenerationInput } from './ui/GenerationInput';
 import { CraftingMenu } from './ui/CraftingMenu';
 import { JobQueue } from './ui/JobQueue';
 import { QuestDisplay } from './ui/QuestDisplay';
+import { CharacterPrefab } from '../utils/prefabs/characters';
+import { StructurePrefab } from '../utils/prefabs/structures';
 
 interface UIOverlayProps {
-  onGenerate: (prompt: string, mode: GenerationMode, count: number, isEnemy?: boolean) => void;
+  onGenerate: (type: GenerationMode, prompt: string, count: number, isEnemy?: boolean, isGiant?: boolean, isFriendly?: boolean, isAquatic?: boolean) => void;
+  onSpawnPredefinedCharacter: (prefab: CharacterPrefab, count: number, isEnemy?: boolean, isGiant?: boolean, isFriendly?: boolean, isAquatic?: boolean) => void;
+  onSpawnPredefinedStructure: (prefab: StructurePrefab, count: number) => void;
   onReset: () => void;
   onExpand: () => void;
+  onShrink: () => void;
   onGiveItem: (item: string, count: number) => void;
   onRespawn: () => void;
   onResetView: () => void;
@@ -26,10 +31,17 @@ interface UIOverlayProps {
   viewMode?: 'FP' | 'OVERHEAD';
   quest: Quest | null;
   questMessage: string | null;
+  playerXp: number;
+  playerLevel: number;
+  xpThresholds: number[];
+  levelUpMessage: string | null;
+  playerGold: number;
+  hasApiKey: boolean;
 }
 
 export const UIOverlay: React.FC<UIOverlayProps> = ({ 
-  onGenerate, onReset, onExpand, onGiveItem, onRespawn, onResetView, jobs, playerHp, playerHunger, inventory, activeSlot, setActiveSlot, onCraft, expansionLevel, viewMode = 'FP', quest, questMessage
+  onGenerate, onSpawnPredefinedCharacter, onSpawnPredefinedStructure, onReset, onExpand, onShrink, onGiveItem, onRespawn, onResetView, jobs, playerHp, playerHunger, inventory, activeSlot, setActiveSlot, onCraft, expansionLevel, viewMode = 'FP', quest, questMessage,
+  playerXp, playerLevel, xpThresholds, levelUpMessage, playerGold, hasApiKey
 }) => {
   const [showCrafting, setShowCrafting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -79,11 +91,24 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
       
       {tooltip && (
         <div 
-            className="fixed z-[100] px-3 py-1.5 bg-black/90 text-white text-xs font-semibold rounded-lg shadow-xl border border-white/20 whitespace-nowrap pointer-events-none transition-opacity duration-200"
+            className="fixed z-100 px-3 py-1.5 bg-black/90 text-white text-xs font-semibold rounded-lg shadow-xl border border-white/20 whitespace-nowrap pointer-events-none transition-opacity duration-200"
             style={{ left: tooltip.x, top: tooltip.y, transform: 'translate(-50%, -100%)' }}
         >
             {tooltip.text}
             <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-black/90 rotate-45 border-r border-b border-white/20"></div>
+        </div>
+      )}
+
+      {/* API Key Warning Banner */}
+      {!hasApiKey && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-100 bg-red-600/95 text-white px-6 py-3 rounded-xl shadow-2xl border border-red-400/50 flex items-center gap-3 pointer-events-auto backdrop-blur-md">
+          <svg className="w-6 h-6 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <div className="font-bold">API Key Missing!</div>
+            <div className="text-sm text-red-100">AI features disabled. Set GEMINI_API_KEY in .env.local</div>
+          </div>
         </div>
       )}
 
@@ -101,12 +126,18 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
         expansionLevel={expansionLevel}
         onResetView={onResetView}
         onExpand={onExpand}
+        onShrink={onShrink}
         onRespawn={onRespawn}
         onReset={onReset}
         onToggleCrafting={() => setShowCrafting(!showCrafting)}
         stopProp={stopProp}
         showTooltip={showTooltip}
         hideTooltip={hideTooltip}
+        playerXp={playerXp}
+        playerLevel={playerLevel}
+        xpThresholds={xpThresholds}
+        levelUpMessage={levelUpMessage}
+        playerGold={playerGold}
       />
 
       <QuestDisplay quest={quest} questMessage={questMessage} />
@@ -128,7 +159,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
         />
         
         <SpawnMenu 
-            onGenerate={onGenerate} 
+            onSpawnPredefinedCharacter={onSpawnPredefinedCharacter}
+            onSpawnPredefinedStructure={onSpawnPredefinedStructure}
             onGiveItem={onGiveItem} 
             count={generationCount}
             stopProp={stopProp}

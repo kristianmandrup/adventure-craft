@@ -3,7 +3,10 @@ import { Block } from '../types';
 
 export const GRAVITY = 18.0;
 export const JUMP_FORCE = 13.0; // Increased from 8.0 for 2x height
-export const SPEED = 6.0;
+export const SPEED = 10.0;  // Base walk speed
+export const MAX_SPRINT_SPEED = 18.0;
+export const ACCELERATION = 20.0;
+export const DECELERATION = 10.0;
 export const PLAYER_HEIGHT = 1.8;
 export const PLAYER_WIDTH = 0.6;
 
@@ -79,7 +82,7 @@ const checkCollision = (pos: THREE.Vector3, blockMap: Map<string, Block>) => {
         if (blockMap.has(`${x},${y},${z}`)) {
            // Check if block is solid (ignore water for collision maybe? logic: water is block type 'water')
            const b = blockMap.get(`${x},${y},${z}`);
-           if (b?.type !== 'water') return true;
+           if (b?.type !== 'water' && b?.type !== 'cloud') return true;
         }
       }
     }

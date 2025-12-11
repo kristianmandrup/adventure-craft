@@ -4,10 +4,14 @@ import { UIOverlay } from './components/UIOverlay';
 import { Minimap } from './components/Minimap';
 import { StartScreen } from './components/StartScreen';
 import { ChatWindow } from './components/ui/ChatWindow';
+import { ShopPanel } from './components/ui/ShopPanel';
 import { generateStructure, generateCharacter, generateDialogue, generateItem } from './services/geminiService';
 import { Block, Character, GenerationMode, Job, InventoryItem, Projectile, ChatMessage, Quest, SpawnMarker } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { generateInitialTerrain, generateExpansion } from './utils/procedural';
+import { generateInitialTerrain, generateExpansion, CaveSpawn, TerrainResult } from './utils/procedural';
+import { CharacterPrefab, animalPrefabs, enemyPrefabs, npcPrefabs } from './utils/prefabs/characters';
+import { StructurePrefab, structurePrefabs } from './utils/prefabs/structures';
+import { DebugOverlay, DebugOverlayRef } from './components/ui/DebugOverlay';
 
 export default function App() {
   const [gameStarted, setGameStarted] = useState(false);
@@ -28,6 +32,43 @@ export default function App() {
   const [respawnTrigger, setRespawnTrigger] = useState(0);
   const [resetViewTrigger, setResetViewTrigger] = useState(0);
 
+  // XP & Level State
+  const [playerXp, setPlayerXp] = useState(0);
+  const [playerLevel, setPlayerLevel] = useState(1);
+  const [levelUpMessage, setLevelUpMessage] = useState<string | null>(null);
+
+  // XP thresholds for each level (cumulative)
+  const XP_THRESHOLDS = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]; // Level 1-10
+  
+  // Calculate stats based on level
+  const getPlayerStats = useCallback(() => {
+    const attackMultiplier = 1 + (playerLevel - 1) * 0.1;  // +10% per level
+    const speedMultiplier = 1 + (playerLevel - 1) * 0.05;  // +5% per level
+    const defenseReduction = (playerLevel - 1) * 0.05;     // 5% damage reduction per level
+    return { attackMultiplier, speedMultiplier, defenseReduction };
+  }, [playerLevel]);
+
+  const handleXpGain = useCallback((amount: number) => {
+    setPlayerXp(prev => {
+      const newXp = prev + amount;
+      // Check for level up
+      let newLevel = playerLevel;
+      for (let i = playerLevel; i < 10; i++) {
+        if (newXp >= XP_THRESHOLDS[i]) {
+          newLevel = i + 1;
+        } else {
+          break;
+        }
+      }
+      if (newLevel > playerLevel) {
+        setPlayerLevel(newLevel);
+        setLevelUpMessage(`Level Up! You are now level ${newLevel}!`);
+        setTimeout(() => setLevelUpMessage(null), 3000);
+      }
+      return newXp;
+    });
+  }, [playerLevel]);
+
   // Quest State
   const [currentQuest, setCurrentQuest] = useState<Quest | null>(null);
   const [questMessage, setQuestMessage] = useState<string | null>(null);
@@ -35,6 +76,10 @@ export default function App() {
   // Chat State
   const [activeDialogNpcId, setActiveDialogNpcId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<Record<string, ChatMessage[]>>({});
+
+  // Shop State
+  const [shopOpen, setShopOpen] = useState(false);
+  const [activeMerchant, setActiveMerchant] = useState<Character | null>(null);
 
   // Position Ref (Shared with Minimap to avoid re-renders)
   const playerPosRef = useRef<[number, number, number] | null>(null);
@@ -44,15 +89,89 @@ export default function App() {
 
   // Expansion State
   const [expansionLevel, setExpansionLevel] = useState(0);
-  const BASE_SIZE = 20;
+  const BASE_SIZE = 40;  // 80x80 starting map (-40 to +40)
   const EXPANSION_STEP = 20;
 
-  // Load initial terrain
+  // Gold & Economy
+  const [playerGold, setPlayerGold] = useState(0);
+  
+  // Portal & Underworld State
+  const [portalActive, setPortalActive] = useState(false);
+  const [portalPosition, setPortalPosition] = useState<[number, number, number] | null>(null);
+  const [isUnderworld, setIsUnderworld] = useState(false);
+  const [worldLevel, setWorldLevel] = useState(1);
+  
+  // API Key Validation
+  const [hasApiKey, setHasApiKey] = useState(true);
+  
+  // Entity Caps
+  const ENTITY_CAPS = {
+    enemies: 20,
+    friendlyNpcs: 10,
+    animals: 10,
+    structures: 10,  // Tracked by spawn count, not blocks
+  };
+  
+  // Check API key on mount
   useEffect(() => {
-    const terrain = generateInitialTerrain();
-    setBlocks(terrain);
+    // @ts-ignore - process.env is injected by Vite
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+      setHasApiKey(false);
+    }
+  }, []);
+  
+  // Count current entities
+  const getEntityCounts = useCallback(() => {
+    const enemies = characters.filter(c => c.isEnemy).length;
+    const animals = characters.filter(c => !c.isEnemy && !c.isFriendly).length;
+    const friendlyNpcs = characters.filter(c => c.isFriendly).length;
+    return { enemies, animals, friendlyNpcs };
+  }, [characters]);
+
+  // Load initial terrain with caves
+  useEffect(() => {
+    const result = generateInitialTerrain();
+    setBlocks(result.blocks);
+    
+    // Spawn cave contents
+    spawnCaveContents(result.caveSpawns);
+    
     generateRandomQuest();
   }, []);
+
+  // Portal spawn timer (60-120 seconds after game start)
+  useEffect(() => {
+    if (!gameStarted || portalActive) return;
+    
+    const delay = 60000 + Math.random() * 60000; // 60-120 seconds
+    const timeout = setTimeout(() => {
+      // Find valid spawn location (on solid ground)
+      const range = BASE_SIZE + (expansionLevel * EXPANSION_STEP);
+      const px = Math.floor(Math.random() * range * 2) - range;
+      const pz = Math.floor(Math.random() * range * 2) - range;
+      
+      // Spawn portal
+      setPortalPosition([px, 5, pz]);
+      setPortalActive(true);
+      
+      // Add spawn marker flash effect
+      setSpawnMarkers(prev => [...prev, { id: uuidv4(), x: px, z: pz, timestamp: Date.now() }]);
+      
+      // Spawn the portal blocks
+      const portalBlocks = structurePrefabs.portal.blocks.map(b => ({
+        id: uuidv4(),
+        x: b.x + px,
+        y: b.y + 1,
+        z: b.z + pz,
+        color: b.color,
+        type: b.type
+      }));
+      setBlocks(prev => [...prev, ...portalBlocks]);
+    }, delay);
+    
+    return () => clearTimeout(timeout);
+  }, [gameStarted, portalActive, expansionLevel]);
 
   // Clean up old spawn markers
   useEffect(() => {
@@ -130,6 +249,9 @@ export default function App() {
 
           if (isComplete) {
               setQuestMessage("Quest Complete!");
+              // Grant XP for quest completion (50-100 based on difficulty)
+              const questXp = 50 + Object.keys(prev.requirements).length * 25;
+              handleXpGain(questXp);
               setTimeout(() => {
                   setQuestMessage(null);
                   generateRandomQuest();
@@ -173,13 +295,30 @@ export default function App() {
   }, [gameStarted, playerHunger]);
 
   const handleExpand = useCallback(() => {
-    if (expansionLevel >= 5) return;
+    if (expansionLevel >= 3) return;  // Max 3 expansions (60 -> 120 blocks)
     
     const currentSize = BASE_SIZE + (expansionLevel * EXPANSION_STEP);
     const newBlocks = generateExpansion(currentSize, EXPANSION_STEP);
     
     setBlocks(prev => [...prev, ...newBlocks]);
     setExpansionLevel(prev => prev + 1);
+  }, [expansionLevel]);
+
+  const handleShrink = useCallback(() => {
+    if (expansionLevel <= 0) return;  // Can't go below initial size
+    
+    const newLevel = expansionLevel - 1;
+    const newSize = BASE_SIZE + (newLevel * EXPANSION_STEP);
+    
+    // Remove blocks outside the new size
+    setBlocks(prev => prev.filter(b => 
+      Math.abs(b.x) <= newSize && Math.abs(b.z) <= newSize
+    ));
+    // Remove characters outside the new size
+    setCharacters(prev => prev.filter(c => 
+      Math.abs(c.position[0]) <= newSize && Math.abs(c.position[2]) <= newSize
+    ));
+    setExpansionLevel(newLevel);
   }, [expansionLevel]);
 
   const handleRespawn = useCallback(() => {
@@ -425,11 +564,245 @@ export default function App() {
             if(existing) return prev.map(i => i.type === 'shield' ? {...i, count: i.count + count} : i);
             return [...prev, { type: 'shield', count: count, color: '#94a3b8' }];
         });
+    } else if (item === 'bow') {
+         setInventory(prev => {
+            const existing = prev.find(i => i.type === 'bow');
+            if(existing) return prev;
+            return [...prev, { type: 'bow', count: 1, color: '#8b4513' }];
+        });
+    } else if (item === 'arrows') {
+         setInventory(prev => {
+            const existing = prev.find(i => i.type === 'arrows');
+            if(existing) return prev.map(i => i.type === 'arrows' ? {...i, count: i.count + 10} : i);
+            return [...prev, { type: 'arrows', count: 10, color: '#d4a574' }];
+        });
+    } else if (item === 'torch') {
+         setInventory(prev => {
+            const existing = prev.find(i => i.type === 'torch');
+            if(existing) return prev.map(i => i.type === 'torch' ? {...i, count: i.count + count} : i);
+            return [...prev, { type: 'torch', count: count, color: '#f59e0b' }];
+        });
+    } else if (item === 'axe') {
+         setInventory(prev => {
+            const existing = prev.find(i => i.type === 'axe');
+            if(existing) return prev.map(i => i.type === 'axe' ? {...i, count: i.count + count} : i);
+            return [...prev, { type: 'axe', count: count, color: '#6b7280' }];
+        });
     }
   };
 
+  // Predefined spawn handlers (no AI API calls)
+  /* Predefined character spawning logic */
+  const spawnPredefinedCharacter = useCallback((
+    prefab: CharacterPrefab,
+    count: number,
+    isEnemy: boolean = false,
+    isGiant: boolean = false,
+    isFriendly: boolean = false,
+    isAquatic: boolean = false
+  ) => {
+    const range = BASE_SIZE + (expansionLevel * EXPANSION_STEP);
+    const newChars: Character[] = [];
+    const playerPos = playerPosRef.current || [0, 5, 0];
+    
+    // Helper: Random Valid Position Finder
+    const findValidPosition = (center: [number, number, number], range: number): [number, number, number] | null => {
+         const playerPos = playerPosRef.current || [0, 5, 0];
+         let attempts = 0;
+         while(attempts < 20) {
+             const rx = center[0] + (Math.floor(Math.random() * range * 2) - range);
+             const rz = center[2] + (Math.floor(Math.random() * range * 2) - range);
+             
+             // Distance check (min 5 blocks from player to avoid clipping)
+             const dist = Math.sqrt((rx - playerPos[0])**2 + (rz - playerPos[2])**2);
+             if (dist < 5) { attempts++; continue; }
+             
+             // Terrain check
+             const inWater = blocks.some(b => Math.round(b.x) === Math.round(rx) && Math.round(b.z) === Math.round(rz) && b.type === 'water');
+             
+             if (isAquatic && !inWater) { attempts++; continue; }
+             if (!isAquatic && inWater) { attempts++; continue; }
+             
+             // Find height
+             let ry = 0;
+             const highestBlock = blocks.filter(b => Math.round(b.x) === Math.round(rx) && Math.round(b.z) === Math.round(rz))
+                                        .sort((a,b) => b.y - a.y)[0];
+             if (highestBlock) ry = highestBlock.y + 1;
+             else ry = 5; // Fallback
+             
+             return [rx, ry, rz];
+         }
+         return null;
+    };
+
+    for (let i = 0; i < count; i++) {
+        let spawnPos: [number, number, number] | null = null;
+        
+        // Try Targeted Spawn first if available
+        if (targetPosRef.current) {
+            const t = targetPosRef.current;
+            const dist = Math.sqrt((t[0] - playerPos[0])**2 + (t[2] - playerPos[2])**2);
+            
+            // Validate Target
+            const inWater = blocks.some(b => Math.round(b.x) === Math.round(t[0]) && Math.round(b.z) === Math.round(t[2]) && b.type === 'water');
+            const validTerrain = isAquatic ? inWater : !inWater;
+            
+            if (validTerrain) {
+                // If terrain is valid, allow it even if close to cursor, but maybe not if <1 block
+                // For targeted spawn we trust the cursor
+                spawnPos = [t[0], t[1] + 1, t[2]];
+            }
+        }
+        
+        // Fallback to Random Range if Target Invalid or not present
+        if (!spawnPos) {
+             spawnPos = findValidPosition(playerPosRef.current || [0,0,0], 10);
+        }
+        
+        if (spawnPos) {
+            const [spawnX, spawnY, spawnZ] = spawnPos;
+            
+            // Add spawn marker
+            setSpawnMarkers(prev => [...prev, { id: uuidv4(), x: spawnX, z: spawnZ, timestamp: Date.now() }]);
+            
+            newChars.push({
+                id: uuidv4(),
+                name: prefab.name,
+                position: [spawnX, spawnY, spawnZ],
+                rotation: Math.random() * Math.PI * 2,
+                parts: prefab.parts,
+                maxHp: isGiant ? 100 : prefab.maxHp,
+                hp: isGiant ? 100 : prefab.maxHp,
+                isEnemy,
+                isGiant,
+                isFriendly,
+                isAquatic,
+            });
+        }
+    }
+    
+    setCharacters(prev => [...prev, ...newChars]);
+  }, [expansionLevel, blocks]);
+
+  // Random entity spawn timer (scales with level and underworld)
+  useEffect(() => {
+    if (!gameStarted) return;
+    
+    const baseInterval = isUnderworld ? 8000 : 15000; // Faster in underworld
+    const levelModifier = Math.max(0.5, 1 - (playerLevel * 0.05)); // Faster at higher levels
+    const spawnInterval = baseInterval * levelModifier;
+    
+    const interval = setInterval(() => {
+      const counts = getEntityCounts();
+      
+      // Random spawn type based on entity caps
+      const roll = Math.random();
+      if (roll < 0.5 && counts.enemies < ENTITY_CAPS.enemies) {
+        // Spawn an enemy
+        const enemyTypes = [enemyPrefabs.zombie, enemyPrefabs.skeleton, enemyPrefabs.spider, enemyPrefabs.sorcerer];
+        const enemy = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+        spawnPredefinedCharacter(enemy, 1, true, false, false, false);
+      } else if (roll < 0.8 && counts.animals < ENTITY_CAPS.animals) {
+        // Spawn an animal (not fish here - fish spawn in water separately)
+        const landAnimals = [animalPrefabs.sheep, animalPrefabs.cow, animalPrefabs.pig, animalPrefabs.chicken];
+        const animal = landAnimals[Math.floor(Math.random() * landAnimals.length)];
+        spawnPredefinedCharacter(animal, 1, false, false, false, false);
+      }
+    }, spawnInterval);
+    
+    return () => clearInterval(interval);
+  }, [gameStarted, isUnderworld, playerLevel, getEntityCounts, spawnPredefinedCharacter]);
+
+  const spawnPredefinedStructure = useCallback((prefab: StructurePrefab, count: number) => {
+    const range = BASE_SIZE + (expansionLevel * EXPANSION_STEP);
+    const newBlocks: Block[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      let spawnX: number, spawnY: number, spawnZ: number;
+      
+      if (targetPosRef.current) {
+        const scatter = count > 1 ? 8 : 0;
+        spawnX = targetPosRef.current[0] + (scatter > 0 ? Math.floor(Math.random() * scatter * 2) - scatter : 0);
+        spawnY = targetPosRef.current[1];
+        spawnZ = targetPosRef.current[2] + (scatter > 0 ? Math.floor(Math.random() * scatter * 2) - scatter : 0);
+      } else {
+        spawnX = Math.floor(Math.random() * range * 2) - range;
+        spawnZ = Math.floor(Math.random() * range * 2) - range;
+        spawnY = 1; // Default ground level
+      }
+      
+      // Add spawn marker
+      setSpawnMarkers(prev => [...prev, { id: uuidv4(), x: spawnX, z: spawnZ, timestamp: Date.now() }]);
+      
+      // Add structure blocks offset to spawn position
+      prefab.blocks.forEach(b => {
+        newBlocks.push({
+          id: uuidv4(),
+          x: b.x + spawnX,
+          y: b.y + spawnY,
+          z: b.z + spawnZ,
+          color: b.color,
+          type: b.type,
+        });
+      });
+    }
+    
+    // Avoid duplicates
+    setBlocks(prev => {
+      const keys = new Set(prev.map(b => `${b.x},${b.y},${b.z}`));
+      return [...prev, ...newBlocks.filter(b => !keys.has(`${b.x},${b.y},${b.z}`))];
+    });
+  }, [expansionLevel]);
+
+  // Spawn cave contents (treasure, boss, or merchant) at cave spawn points
+  const spawnCaveContents = (caveSpawns: CaveSpawn[]) => {
+    caveSpawns.forEach(spawn => {
+      if (spawn.type === 'treasure') {
+        // Create a treasure chest (gold blocks + give random items when approached)
+        setBlocks(prev => [...prev, 
+          { id: uuidv4(), x: spawn.x, y: spawn.y, z: spawn.z, color: '#fbbf24', type: 'gold' },
+          { id: uuidv4(), x: spawn.x, y: spawn.y + 1, z: spawn.z, color: '#b45309', type: 'wood' },
+        ]);
+        // Add marker for treasure location
+        setSpawnMarkers(prev => [...prev, { id: uuidv4(), x: spawn.x, z: spawn.z, timestamp: Date.now() }]);
+      } else if (spawn.type === 'boss') {
+        // Spawn a powerful enemy boss
+        const bossChar: Character = {
+          id: uuidv4(),
+          name: 'Cave Guardian',
+          position: [spawn.x, spawn.y, spawn.z],
+          rotation: 0,
+          parts: enemyPrefabs.sorcerer.parts, // Use sorcerer appearance
+          maxHp: 150,
+          hp: 150,
+          isEnemy: true,
+          isGiant: true,
+          isFriendly: false,
+        };
+        setCharacters(prev => [...prev, bossChar]);
+        setSpawnMarkers(prev => [...prev, { id: uuidv4(), x: spawn.x, z: spawn.z, timestamp: Date.now() }]);
+      } else if (spawn.type === 'merchant') {
+        // Spawn a merchant NPC
+        const merchantChar: Character = {
+          id: uuidv4(),
+          name: 'Cave Merchant',
+          position: [spawn.x, spawn.y, spawn.z],
+          rotation: 0,
+          parts: npcPrefabs.villager.parts,
+          maxHp: 100,
+          hp: 100,
+          isEnemy: false,
+          isFriendly: true,
+        };
+        setCharacters(prev => [...prev, merchantChar]);
+        setSpawnMarkers(prev => [...prev, { id: uuidv4(), x: spawn.x, z: spawn.z, timestamp: Date.now() }]);
+      }
+    });
+  };
+
   const handleReset = useCallback(() => {
-    setBlocks(generateInitialTerrain()); 
+    const result = generateInitialTerrain();
+    setBlocks(result.blocks); 
     setCharacters([]); 
     setProjectiles([]);
     setSpawnMarkers([]);
@@ -438,15 +811,97 @@ export default function App() {
     setInventory([]);
     setPlayerHp(100);
     setPlayerHunger(100);
+    setPlayerXp(0);
+    setPlayerLevel(1);
+    setPlayerGold(0);  // Reset gold
+    setPortalActive(false);  // Reset portal
+    setPortalPosition(null);
+    setIsUnderworld(false);
     setRespawnTrigger(prev => prev + 1);
     setIsRaining(false);
+    setCurrentQuest(null);  // Reset quest
+    setQuestMessage(null);
+    setLevelUpMessage(null);  // Clear any level up message
     generateRandomQuest();
+    
+    // Spawn cave contents after a delay to let state settle
+    setTimeout(() => spawnCaveContents(result.caveSpawns), 100);
   }, []);
 
-  // Chat
+  // Gold gain handler
+  const handleGoldGain = useCallback((amount: number) => {
+    setPlayerGold(prev => prev + amount);
+  }, []);
+
+  // Buy item from shop
+  const handleBuyItem = useCallback((type: string, cost: number): boolean => {
+    if (playerGold < cost) return false;
+    
+    setPlayerGold(prev => prev - cost);
+    
+    // Add item to inventory
+    if (type === 'weapon') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'weapon');
+        if (existing) return prev.map(i => i.type === 'weapon' ? {...i, count: i.count + 1} : i);
+        return [...prev, { type: 'weapon', count: 1, color: '#06b6d4' }];
+      });
+    } else if (type === 'axe') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'axe');
+        if (existing) return prev.map(i => i.type === 'axe' ? {...i, count: i.count + 1} : i);
+        return [...prev, { type: 'axe', count: 1, color: '#6b7280' }];
+      });
+    } else if (type === 'bow') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'bow');
+        if (existing) return prev;
+        return [...prev, { type: 'bow', count: 1, color: '#8b4513' }];
+      });
+    } else if (type === 'arrows') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'arrows');
+        if (existing) return prev.map(i => i.type === 'arrows' ? {...i, count: i.count + 10} : i);
+        return [...prev, { type: 'arrows', count: 10, color: '#d4a574' }];
+      });
+    } else if (type === 'shield') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'shield');
+        if (existing) return prev.map(i => i.type === 'shield' ? {...i, count: i.count + 1} : i);
+        return [...prev, { type: 'shield', count: 1, color: '#94a3b8' }];
+      });
+    } else if (type === 'torch') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'torch');
+        if (existing) return prev.map(i => i.type === 'torch' ? {...i, count: i.count + 1} : i);
+        return [...prev, { type: 'torch', count: 1, color: '#f59e0b' }];
+      });
+    } else if (type === 'apple') {
+      setInventory(prev => {
+        const existing = prev.find(i => i.type === 'apple');
+        if (existing) return prev.map(i => i.type === 'apple' ? {...i, count: i.count + 1} : i);
+        return [...prev, { type: 'apple', count: 1, color: '#ef4444' }];
+      });
+    }
+    
+    return true;
+  }, [playerGold]);
+
+  // Chat / NPC Interaction
   const handleNpcInteract = (char: Character) => {
-      setActiveDialogNpcId(char.id);
-      if (document.pointerLockElement) document.exitPointerLock();
+      // Check if this is a merchant
+      const isMerchant = char.name.toLowerCase().includes('merchant') || 
+                         char.name.toLowerCase().includes('trader') ||
+                         char.name.toLowerCase().includes('shopkeeper');
+      
+      if (isMerchant) {
+        setActiveMerchant(char);
+        setShopOpen(true);
+        if (document.pointerLockElement) document.exitPointerLock();
+      } else {
+        setActiveDialogNpcId(char.id);
+        if (document.pointerLockElement) document.exitPointerLock();
+      }
   };
 
   const handleSendMessage = async (text: string) => {
@@ -468,6 +923,13 @@ export default function App() {
           [activeDialogNpcId]: [...updatedHistory, { sender: 'NPC', text: npcResponse }] 
       }));
   };
+
+  // Debug Overlay Ref
+  const debugOverlayRef = useRef<DebugOverlayRef>(null);
+  
+  const handleDebugUpdate = useCallback((info: any) => {
+      debugOverlayRef.current?.update(info);
+  }, []);
 
   return (
     <div className="w-full h-screen relative overflow-hidden">
@@ -498,6 +960,10 @@ export default function App() {
         playerPosRef={playerPosRef}
         onCharacterInteract={handleNpcInteract}
         onQuestUpdate={handleQuestUpdate}
+        playerStats={getPlayerStats()}
+        onXpGain={handleXpGain}
+        onGoldGain={handleGoldGain}
+        onDebugUpdate={handleDebugUpdate}
       />
       
       {/* Minimap overlays on top */}
@@ -512,8 +978,11 @@ export default function App() {
 
           <UIOverlay 
             onGenerate={addJob} 
+            onSpawnPredefinedCharacter={spawnPredefinedCharacter}
+            onSpawnPredefinedStructure={spawnPredefinedStructure}
             onReset={handleReset}
             onExpand={handleExpand}
+            onShrink={handleShrink}
             onGiveItem={handleGiveItem}
             onRespawn={handleRespawn}
             onResetView={handleResetView}
@@ -528,7 +997,15 @@ export default function App() {
             viewMode={viewMode}
             quest={currentQuest}
             questMessage={questMessage}
+            playerXp={playerXp}
+            playerLevel={playerLevel}
+            xpThresholds={XP_THRESHOLDS}
+            levelUpMessage={levelUpMessage}
+            playerGold={playerGold}
+            hasApiKey={hasApiKey}
           />
+          
+          <DebugOverlay ref={debugOverlayRef} />
 
           {activeDialogNpcId && (
               <ChatWindow 
@@ -537,6 +1014,16 @@ export default function App() {
                 onSendMessage={handleSendMessage}
                 onClose={() => { setActiveDialogNpcId(null); setViewMode('FP'); }}
                 stopProp={(e) => e.stopPropagation()}
+              />
+          )}
+          
+          {shopOpen && activeMerchant && (
+              <ShopPanel
+                playerGold={playerGold}
+                onBuyItem={handleBuyItem}
+                onClose={() => { setShopOpen(false); setActiveMerchant(null); setViewMode('FP'); }}
+                stopProp={(e) => e.stopPropagation()}
+                merchantName={activeMerchant.name}
               />
           )}
         </>

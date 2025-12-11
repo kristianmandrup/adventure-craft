@@ -7,6 +7,7 @@ export interface Block {
   z: number;
   color: string;
   type?: string; // e.g., 'wood', 'stone', 'leaf', 'water'
+  hp?: number;   // Block HP for trees/structures (undefined = instant break)
 }
 
 export interface CharacterVoxel {

@@ -8,8 +8,8 @@ import { useGameAI } from '../hooks/useGameAI';
 
 interface WorldControllerProps {
   blockMap: Map<string, Block>;
-  position: THREE.Vector3;
-  setPosition: (v: THREE.Vector3) => void;
+  positionRef: React.MutableRefObject<THREE.Vector3>;
+  rainGroupRef: React.RefObject<THREE.Group>;
   setBlocks: React.Dispatch<React.SetStateAction<Block[]>>;
   inventory: InventoryItem[];
   setInventory: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
@@ -29,20 +29,25 @@ interface WorldControllerProps {
   resetViewTrigger: number;
   playerPosRef?: React.MutableRefObject<[number, number, number] | null>;
   onQuestUpdate: (type: string, amount: number) => void;
+  playerStats: { attackMultiplier: number; speedMultiplier: number; defenseReduction: number };
+  onXpGain: (amount: number) => void;
+  onGoldGain: (amount: number) => void;
+  onDebugUpdate?: (info: any) => void;
 }
 
 export const WorldController: React.FC<WorldControllerProps> = ({ 
-  blockMap, position, setPosition, setBlocks, inventory, setInventory, activeSlot, 
+  blockMap, positionRef, rainGroupRef, setBlocks, inventory, setInventory, activeSlot, 
   characters, setCharacters, projectiles, setProjectiles, controlsRef, setIsLocked, setPlayerHunger, setPlayerHp, respawnTrigger,
-  viewMode, setViewMode, targetPosRef, resetViewTrigger, playerPosRef, onQuestUpdate
+  viewMode, setViewMode, targetPosRef, resetViewTrigger, playerPosRef, onQuestUpdate,
+  playerStats, onXpGain, onGoldGain, onDebugUpdate
 }) => {
 
   // Sync player position for minimap
   useEffect(() => {
-    if (playerPosRef) {
-        playerPosRef.current = [position.x, position.y, position.z];
+    if (playerPosRef && positionRef.current) {
+        playerPosRef.current = [positionRef.current.x, positionRef.current.y, positionRef.current.z];
     }
-  }, [position, playerPosRef]);
+  }, [playerPosRef]);
 
   // Keyboard listener for View Mode Toggle (not handled in hooks because it interacts with UI/State)
   useEffect(() => {
@@ -59,41 +64,91 @@ export const WorldController: React.FC<WorldControllerProps> = ({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [viewMode, setViewMode]);
 
-  // Hook: Physics & Movement
-  const { isLocked, camAngle } = usePlayerPhysics({
-    controlsRef, blockMap, position, setPosition, viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger
+  // Physics Hook
+  const { isLocked: isLockedRef, camAngle, debugInfo } = usePlayerPhysics({ 
+    controlsRef, blockMap, positionRef, rainGroupRef,
+    viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger, playerPosRef
   });
 
-  // Hook: Interaction (Mining, Placing, Attacking)
-  const { armRef, isAttacking } = usePlayerInteraction({
-    blockMap, position, inventory, setInventory, activeSlot, setBlocks, setCharacters, setPlayerHunger, viewMode, isLocked, targetPosRef, characters, onQuestUpdate
+  // Interaction Hook
+  const { cursorPos, armRef, isAttacking } = usePlayerInteraction({
+    blockMap,
+    positionRef,
+    inventory,
+    setInventory,
+    activeSlot,
+    setBlocks,
+    setCharacters,
+    setPlayerHunger,
+    viewMode,
+    isLocked: isLockedRef,
+    targetPosRef,
+    characters,
+    onQuestUpdate,
+    setProjectiles,
+    playerStats,
+    onXpGain,
+    onGoldGain,
+    camera: controlsRef.current?.getObject()
   });
 
-  // Hook: Game AI (Enemies, Projectiles)
+  // AI Hook
   useGameAI({
-    characters, setCharacters, projectiles, setProjectiles, position, setPlayerHp, blockMap
+    characters,
+    setCharacters,
+    playerPosRef: positionRef, // Pass the ref itself
+    projectiles,
+    setProjectiles,
+    setPlayerHp,
+    setPlayerHunger,
+    isLocked: isLockedRef,
+    onDebugUpdate,
+    blockMap,
+    inventory,
+    playerStats
   });
+
+  // Update parent with debug info
+  useEffect(() => {
+     if (onDebugUpdate) {
+         onDebugUpdate({
+             ...debugInfo,
+             pitch: camAngle.pitch,
+             yaw: camAngle.yaw
+         });
+     }
+  }, [debugInfo, camAngle, onDebugUpdate]);
 
   return (
-    <>
-      <Html position={[0, 0, 0]} calculatePosition={() => [0, 0, 0]} style={{ pointerEvents: 'none' }}>
-         <div style={{ position: 'fixed', bottom: '20px', right: '180px', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontFamily: 'monospace', background: 'rgba(0,0,0,0.5)', padding: '8px', borderRadius: '8px' }}>
-            <div>ANGLE VIEW</div>
-            <div>PITCH: {camAngle.pitch}°</div>
-            <div>YAW: {camAngle.yaw}°</div>
-         </div>
-      </Html>
-
+    <group>
+      {/* Player Model / Arm */}
       {viewMode === 'FP' && (
-        <group position={position}>
-           <group ref={armRef} position={[0.3, 0.4, 0.4]}>
-             <mesh rotation={[0,0,0]} scale={[0.15, 0.15, 0.6]}>
-                 <boxGeometry />
-                 <meshStandardMaterial color="#eab308" />
-             </mesh>
-           </group>
+        <group ref={armRef} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]}>
+           {/* Simple Arm Model */}
+           <mesh position={[0.3, -0.2, -0.5]} rotation={[-0.2, 0, 0]}>
+             <boxGeometry args={[0.1, 0.1, 0.4]} />
+             <meshStandardMaterial color="#eecfa1" />
+           </mesh>
+             {/* Item in Hand */}
+             {inventory[activeSlot] && (
+               <mesh position={[0.3, -0.2, -0.8]} rotation={[0, 0, 0.2]}>
+                  <boxGeometry args={[0.2, 0.2, 0.2]} />
+                  <meshStandardMaterial color={inventory[activeSlot].color} />
+               </mesh>
+             )}
         </group>
       )}
-    </>
+
+      {/* Cursor Highlight */}
+      {cursorPos && (
+        <mesh position={[cursorPos[0], cursorPos[1], cursorPos[2]]}>
+          <boxGeometry args={[1.05, 1.05, 1.05]} />
+          <meshBasicMaterial color="white" wireframe transparent opacity={0.5} />
+        </mesh>
+      )}
+      
+      {/* Compass / Direction Indicator (Optional) */}
+      <arrowHelper args={[new THREE.Vector3(0,0,-1), positionRef.current, 1, 0xffff00]} />
+    </group>
   );
 };
