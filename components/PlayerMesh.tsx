@@ -8,9 +8,10 @@ import { Shield } from './weapons/Shield';
 interface PlayerMeshProps {
     equipment: Equipment;
     velocityRef: React.MutableRefObject<THREE.Vector3>;
+    isSwimming?: boolean;
 }
 
-export const PlayerMesh: React.FC<PlayerMeshProps> = ({ equipment, velocityRef }) => {
+export const PlayerMesh: React.FC<PlayerMeshProps> = ({ equipment, velocityRef, isSwimming }) => {
     const groupRef = useRef<THREE.Group>(null);
     const leftLegRef = useRef<THREE.Group>(null);
     const rightLegRef = useRef<THREE.Group>(null);
@@ -23,18 +24,50 @@ export const PlayerMesh: React.FC<PlayerMeshProps> = ({ equipment, velocityRef }
         const time = state.clock.getElapsedTime();
         const isMoving = velocityRef.current.length() > 0.1;
         
-        if (isMoving) {
+        if (isSwimming) {
+            // Swimming animation - prone position with arm/leg strokes
+            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, Math.PI / 2.5, 0.1);
+            groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, -0.5, 0.1);
+            
+            const swimSpeed = 4;
+            if (leftLegRef.current) leftLegRef.current.rotation.x = Math.sin(time * swimSpeed) * 0.3;
+            if (rightLegRef.current) rightLegRef.current.rotation.x = Math.sin(time * swimSpeed + Math.PI) * 0.3;
+            if (leftArmRef.current) {
+                leftArmRef.current.rotation.x = Math.sin(time * swimSpeed * 0.5) * 0.8;
+                leftArmRef.current.rotation.z = Math.abs(Math.sin(time * swimSpeed * 0.5)) * 0.5;
+            }
+            if (rightArmRef.current) {
+                rightArmRef.current.rotation.x = Math.sin(time * swimSpeed * 0.5 + Math.PI) * 0.8;
+                rightArmRef.current.rotation.z = -Math.abs(Math.sin(time * swimSpeed * 0.5 + Math.PI)) * 0.5;
+            }
+        } else if (isMoving) {
+            // Reset from swimming
+            if (groupRef.current.rotation.x !== 0) {
+                groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
+                groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0, 0.1);
+            }
+            
             const speed = 10;
             if (leftLegRef.current) leftLegRef.current.rotation.x = Math.sin(time * speed) * 0.5;
             if (rightLegRef.current) rightLegRef.current.rotation.x = Math.sin(time * speed + Math.PI) * 0.5;
-            if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(time * speed + Math.PI) * 0.5;
-            if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(time * speed) * 0.5;
+            if (leftArmRef.current) {
+                leftArmRef.current.rotation.x = Math.sin(time * speed + Math.PI) * 0.5;
+                leftArmRef.current.rotation.z = 0;
+            }
+            if (rightArmRef.current) {
+                rightArmRef.current.rotation.x = Math.sin(time * speed) * 0.5;
+                rightArmRef.current.rotation.z = 0;
+            }
         } else {
-            // Idle
+            // Idle - reset all
+            if (groupRef.current.rotation.x !== 0) {
+                groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
+                groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0, 0.1);
+            }
             if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
             if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
-            if (leftArmRef.current) leftArmRef.current.rotation.x = 0;
-            if (rightArmRef.current) rightArmRef.current.rotation.x = 0;
+            if (leftArmRef.current) { leftArmRef.current.rotation.x = 0; leftArmRef.current.rotation.z = 0; }
+            if (rightArmRef.current) { rightArmRef.current.rotation.x = 0; rightArmRef.current.rotation.z = 0; }
         }
     });
 

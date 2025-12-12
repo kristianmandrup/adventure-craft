@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import * as THREE from 'three';
-import { Character, InventoryItem, Projectile } from '../../types';
+import { Character, InventoryItem, Projectile, GameMode } from '../../types';
 import { audioManager } from '../../utils/audio';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,6 +17,7 @@ interface UseCombatProps {
     onNotification: (message: string, type: import('../../types').NotificationType, subMessage?: string) => void;
     setDroppedItems: React.Dispatch<React.SetStateAction<import('../../types').DroppedItem[]>>;
     onSpawnParticles: (pos: THREE.Vector3, color: string) => void;
+    difficultyMode?: GameMode;
 }
 
 const ENEMY_XP: Record<string, number> = {
@@ -29,7 +30,8 @@ const ENEMY_GOLD: Record<string, [number, number]> = {
 
 export const useCombat = ({
     characters, setCharacters, setProjectiles, inventory, setInventory, playerStats,
-    onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems, onSpawnParticles
+    onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems, onSpawnParticles,
+    difficultyMode
 }: UseCombatProps) => {
 
     const spawnDrop = (position: THREE.Vector3, type: string, count: number, color: string) => {
@@ -55,7 +57,7 @@ export const useCombat = ({
                 
                 for (const c of characters) {
                     if (!c.isEnemy) continue;
-                    const charPos = new THREE.Vector3(...c.position);
+                    const charPos = new THREE.Vector3(...c.playerPos!);
                     const dist = charPos.distanceTo(playerPos);
                     if (dist > 15) continue;
                     const toChar = charPos.clone().sub(playerPos).normalize();
@@ -66,7 +68,7 @@ export const useCombat = ({
                 }
 
                 const arrowDir = nearestEnemy 
-                    ? new THREE.Vector3(...nearestEnemy.position).sub(playerPos).normalize()
+                    ? new THREE.Vector3(...nearestEnemy.playerPos!).sub(playerPos).normalize()
                     : dir;
 
                 setProjectiles(prev => [...prev, {
@@ -110,7 +112,7 @@ export const useCombat = ({
         camera.getWorldDirection(dir);
         
         const hitChars = characters.filter(c => {
-             const charPos = new THREE.Vector3(...c.position);
+             const charPos = new THREE.Vector3(...c.playerPos!);
              const toChar = charPos.clone().sub(camera.position);
              const dist = toChar.length();
              if (dist > 5) return false;
@@ -124,7 +126,10 @@ export const useCombat = ({
             const damage = Math.floor(baseDamage * playerStats.attackMultiplier);
 
             setCharacters(prev => {
-                return prev.map(c => {
+                const nextChars: Character[] = [];
+                const newSpawns: Character[] = [];
+
+                prev.forEach(c => {
                     if (hitChars.find(hc => hc.id === c.id)) {
                         const newHp = c.hp - damage;
                         onNotification(`You hit ${c.name} for ${damage} damage`, 'COMBAT_HIT');
@@ -143,6 +148,29 @@ export const useCombat = ({
                                 enemyType = type.includes('guardian') ? 'boss' : 'giant';
                             }
                             
+                            // Dark Underworld Specifics
+                            if (difficultyMode === 'DARK_UNDERWORLD') {
+                                if (type.includes('pig')) {
+                                     // Spawn new pig
+                                     const angle = Math.random() * Math.PI * 2;
+                                     const dist = 5 + Math.random() * 5;
+                                     const px = c.playerPos![0] + Math.cos(angle) * dist;
+                                     const pz = c.playerPos![2] + Math.sin(angle) * dist;
+                                     
+                                     newSpawns.push({
+                                         ...c,
+                                         id: uuidv4(),
+                                         hp: c.maxHp,
+                                         playerPos: [px, c.playerPos![1], pz], // Y? Maintain Y?
+                                     });
+                                     // onNotification("A pig respawned from the darkness!", 'INFO');
+                                }
+                                
+                                if (enemyType === 'boss' || enemyType === 'giant' || type.includes('guardian')) {
+                                     onQuestUpdate('boss', 1);
+                                }
+                            }
+
                             try {
                                 if (enemyType === 'zombie') audioManager.playSFX('ZOMBIE_DEATH');
                                 else if (enemyType === 'sorcerer') audioManager.playSFX('SORCERER_DEATH');
@@ -169,15 +197,21 @@ export const useCombat = ({
                                    if (type.includes('sheep')) { meatType = 'mutton_meat'; color = '#c08081'; count = 1; }
                                    if (type.includes('fish')) { meatType = 'fish_meat'; color = '#ff6b35'; count = 1; }
 
-                                   spawnDrop(new THREE.Vector3(...c.position), meatType, count, color);
+                                   spawnDrop(new THREE.Vector3(...c.playerPos!), meatType, count, color);
                                    dropsText.push(`${count} ${meatType.replace('_meat', '')}`);
+                                   
+                                   // Sheep drops wool in addition to meat
+                                   if (type.includes('sheep')) {
+                                       spawnDrop(new THREE.Vector3(...c.playerPos!).add(new THREE.Vector3(0.5, 0, 0.5)), 'wool', 1, '#f5f5dc');
+                                       dropsText.push('1 wool');
+                                   }
                                 } 
                                 // Enemy Drops
                                 else if (c.isEnemy) {
                                    const drops = ['meat', 'apple', 'wood', 'stone'];
                                    if (Math.random() < 0.5) {
                                        const droppedItemType = drops[Math.floor(Math.random() * drops.length)];
-                                       spawnDrop(new THREE.Vector3(...c.position), droppedItemType, 1, '#ef4444');
+                                       spawnDrop(new THREE.Vector3(...c.playerPos!), droppedItemType, 1, '#ef4444');
                                        dropsText.push(`a ${droppedItemType}`);
                                    }
                                    
@@ -188,10 +222,16 @@ export const useCombat = ({
                                        dropsText.push(`${goldAmount} gold`);
                                        
                                        // Boss / Giant Armor Drop Chance
-                                       if ((enemyType === 'boss' || enemyType === 'giant') && Math.random() < 0.3) {
-                                            spawnDrop(new THREE.Vector3(...c.position), 'iron_armor', 1, '#9ca3af');
-                                            dropsText.push('Iron Armor');
-                                       }
+                                        if ((enemyType === 'boss' || enemyType === 'giant') && Math.random() < 0.3) {
+                                             spawnDrop(new THREE.Vector3(...c.playerPos!), 'iron_armor', 1, '#9ca3af');
+                                             dropsText.push('Iron Armor');
+                                        }
+                                        
+                                        // Giants and Skeletons drop bones
+                                        if (enemyType === 'giant' || enemyType === 'skeleton') {
+                                             spawnDrop(new THREE.Vector3(...c.playerPos!).add(new THREE.Vector3(0.3, 0, 0.3)), 'bone', 1, '#f5f5dc');
+                                             dropsText.push('1 bone');
+                                        }
                                    }
                                 }
 
@@ -206,29 +246,31 @@ export const useCombat = ({
                             try { 
                                 audioManager.playSFX('PUNCH_HIT');
                                 if (c.name.toLowerCase().includes('zombie')) audioManager.playSFX('ZOMBIE_HIT');
-                                else if (isAnimal) audioManager.playSFX('ANIMAL_HURT'); // Placeholder if you have it, else PUNCH_HIT works
+                                else if (!c.isEnemy) audioManager.playSFX('PUNCH_HIT'); // Animal hit sound
                             } catch (e) {}
                             
                             // Enemy Knockback
                             const camPos = camera.position.clone(); 
-                            const enemyPos = new THREE.Vector3(...c.position);
+                            const enemyPos = new THREE.Vector3(...c.playerPos!);
                             const pushDir = enemyPos.clone().sub(camPos).normalize();
                             pushDir.y = 0; 
                             
                             // Move 1 block
-                            c.position = [
-                                c.position[0] + pushDir.x * 1,
-                                c.position[1],
-                                c.position[2] + pushDir.z * 1
-                            ] as [number, number, number];
-                            
+                            const knockbackScale = 1;
+                            const newPos: [number, number, number] = [
+                                c.playerPos![0] + pushDir.x * knockbackScale,
+                                c.playerPos![1],
+                                c.playerPos![2] + pushDir.z * knockbackScale
+                            ];
+
                             // Trigger Fleeing
-                            c.lastDamagedTime = Date.now();
+                            nextChars.push({ ...c, hp: newHp, lastDamagedTime: Date.now(), playerPos: newPos });
                         }
-                        return { ...c, hp: newHp, lastDamagedTime: Date.now() };
+                    } else {
+                        nextChars.push(c);
                     }
-                    return c;
-                }).filter(c => c.hp > 0);
+                });
+                return [...nextChars, ...newSpawns];
             });
             return true; // Hit something
         }

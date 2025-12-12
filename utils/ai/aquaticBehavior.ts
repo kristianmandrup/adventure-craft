@@ -5,7 +5,7 @@ export const updateAquaticCharacter = (
     char: Character, 
     blockMap: Map<string, Block>
 ): Character => {
-    const charPos = new THREE.Vector3(...char.position);
+    const charPos = new THREE.Vector3(...char.playerPos!);
     let isMoving = false;
     let wanderTarget = char.wanderTarget;
 
@@ -44,7 +44,7 @@ export const updateAquaticCharacter = (
         
         return {
             ...char,
-            position: [newPos.x, newPos.y, newPos.z],
+            playerPos: [newPos.x, newPos.y, newPos.z],
             rotation: Math.atan2(dir.x, dir.z),
             isMoving,
             wanderTarget

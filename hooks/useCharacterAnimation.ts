@@ -20,7 +20,7 @@ export const useCharacterAnimation = (
     if (!groupRef.current) return;
 
     // Smooth position interpolation
-    groupRef.current.position.lerp(new THREE.Vector3(...character.position), 0.1);
+    groupRef.current.position.lerp(new THREE.Vector3(...character.playerPos!), 0.1);
     
     // Smooth rotation
     let currentRot = groupRef.current.rotation.y;

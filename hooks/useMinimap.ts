@@ -84,8 +84,8 @@ export const useMinimap = ({ playerPosRef, characters, blocks, filter, spawnMark
 
       // Draw Characters
       characters.forEach(char => {
-        const dx = char.position[0] - px;
-        const dz = char.position[2] - pz;
+        const dx = char.playerPos![0] - px;
+        const dz = char.playerPos![2] - pz;
         
         if (Math.abs(dx) < range && Math.abs(dz) < range) {
              const cx = center + dx * scale;
@@ -180,7 +180,7 @@ export const useMinimap = ({ playerPosRef, characters, blocks, filter, spawnMark
 
     render();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [filter, characters, filterBlocks, playerPosRef, spawnMarkers]);
+  }, [filter, characters, filterBlocks, playerPosRef, spawnMarkers, portalPosition]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
      if (!playerPosRef.current) return;
@@ -204,7 +204,7 @@ export const useMinimap = ({ playerPosRef, characters, blocks, filter, spawnMark
      let minDist = 5;
 
      for (const char of characters) {
-        const dist = Math.sqrt(Math.pow(char.position[0] - worldX, 2) + Math.pow(char.position[2] - worldZ, 2));
+        const dist = Math.sqrt(Math.pow(char.playerPos![0] - worldX, 2) + Math.pow(char.playerPos![2] - worldZ, 2));
         if (dist < minDist) {
             minDist = dist;
             found = char.name;

@@ -364,6 +364,78 @@ export const fireplacePrefab: StructurePrefab = {
   })()
 };
 
+export const sugarCanePrefab: StructurePrefab = {
+  name: 'Sugar Cane',
+  blocks: (() => {
+    const blocks: Omit<Block, 'id'>[] = [];
+    
+    // Tall green stalks (2-3 blocks high)
+    const height = 2 + Math.floor(Math.random() * 2);
+    for (let y = 0; y < height; y++) {
+      blocks.push({ x: 0, y, z: 0, color: '#22c55e', type: 'sugar_cane' });
+    }
+    // Sometimes spawn a second stalk nearby
+    if (Math.random() > 0.5) {
+      for (let y = 0; y < Math.max(1, height - 1); y++) {
+        blocks.push({ x: 1, y, z: 0, color: '#16a34a', type: 'sugar_cane' });
+      }
+    }
+    
+    return blocks;
+  })()
+};
+
+export const grapeBushPrefab: StructurePrefab = {
+  name: 'Grape Bush',
+  blocks: (() => {
+    const blocks: Omit<Block, 'id'>[] = [];
+    
+    // Grape vine bush with purple grapes
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+        for (let y = 0; y <= 1; y++) {
+          if (Math.random() > 0.2) {
+            const isGrape = Math.random() < 0.3; // 30% grapes
+            blocks.push({
+              x, y, z,
+              color: isGrape ? '#7c3aed' : '#166534',
+              type: isGrape ? 'grape' : 'leaf'
+            });
+          }
+        }
+      }
+    }
+    // Top with grapes
+    blocks.push({ x: 0, y: 2, z: 0, color: '#7c3aed', type: 'grape' });
+    
+    return blocks;
+  })()
+};
+
+export const wheatFieldPrefab: StructurePrefab = {
+  name: 'Wheat Field',
+  blocks: (() => {
+    const blocks: Omit<Block, 'id'>[] = [];
+    
+    // Small wheat field patch (golden stalks)
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+        // Wheat stalks 1-2 blocks tall
+        const height = 1 + Math.floor(Math.random() * 2);
+        for (let y = 0; y < height; y++) {
+          blocks.push({
+            x, y, z,
+            color: '#eab308', // Golden yellow
+            type: 'wheat'
+          });
+        }
+      }
+    }
+    
+    return blocks;
+  })()
+};
+
 // Export all prefabs
 export const structurePrefabs = {
   house: housePrefab,
@@ -374,5 +446,8 @@ export const structurePrefabs = {
   bush: bushPrefab,
   portal: portalPrefab,
   fireplace: fireplacePrefab,
+  sugarCane: sugarCanePrefab,
+  grapeBush: grapeBushPrefab,
+  wheatField: wheatFieldPrefab,
 };
 

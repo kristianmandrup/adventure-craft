@@ -96,7 +96,7 @@ export const useSpawner = (
                 newChars.push({
                     id: uuidv4(),
                     name: prefab.name,
-                    position: [spawnX, spawnY, spawnZ],
+                    playerPos: [spawnX, spawnY, spawnZ],
                     rotation: Math.random() * Math.PI * 2,
                     parts: prefab.parts,
                     maxHp: isGiant ? 100 : prefab.maxHp,
@@ -121,7 +121,7 @@ export const useSpawner = (
                    const bossChar: Character = {
                        id: uuidv4(),
                        name: 'Cave Guardian',
-                       position: [spawn.x, spawn.y, spawn.z],
+                       playerPos: [spawn.x, spawn.y, spawn.z],
                        rotation: 0,
                        parts: enemyPrefabs.sorcerer.parts,
                        maxHp: 200, hp: 200,
@@ -144,7 +144,7 @@ export const useSpawner = (
                    const merchantChar: Character = {
                        id: uuidv4(),
                        name: 'Merchant',
-                       position: [spawn.x, spawn.y, spawn.z],
+                       playerPos: [spawn.x, spawn.y, spawn.z],
                        rotation: 0,
                        parts: npcPrefabs.merchant?.parts || animalPrefabs.pig.parts, // Fallback if merchant prefab missing
                        maxHp: 100, hp: 100,

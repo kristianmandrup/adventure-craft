@@ -50,6 +50,7 @@ export const getItemStats = (type: string): ItemStats => {
   // Armor - Feet
   if (t.includes('boots') || t.includes('shoes')) {
       if (t === 'magic_boots') return { attack: 0, defense: 2, speed: 50, special: 'Super Speed' };
+      if (t === 'swimming_boots' || t.includes('swim')) return { attack: 0, defense: 2, speed: 5, special: 'water_walk', description: 'Walk on water' };
       if (t.includes('iron')) return { attack: 0, defense: 6, speed: -2 };
       return { attack: 0, defense: 3, speed: 2 };
   }

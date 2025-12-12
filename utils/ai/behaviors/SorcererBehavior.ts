@@ -76,24 +76,51 @@ const handleAttack = (dist: number, char: Character, context: AIContext, charPos
 
 export const SorcererBehavior: BehaviorStrategy = {
     update: (char: Character, context: AIContext): { character: Character, soundEvent?: string, spawnRequest?: SpawnRequest } => {
-        const charPos = new THREE.Vector3(...char.position);
+        const charPos = new THREE.Vector3(...char.playerPos!);
         const dist = charPos.distanceTo(context.playerPos);
 
-        // 1. Try Summoning
+        // 1. Try Summoning (high priority)
         const summonRes = handleSummoning(dist, char, charPos, context.playerPos);
         if (summonRes && summonRes.updatedChar) {
             return { character: summonRes.updatedChar, soundEvent: summonRes.soundEvent, spawnRequest: summonRes.spawnRequest };
         }
 
-        // 2. Try Attacking
+        // 2. Try Attacking (returns attack action if cooldown ready)
         const attackRes = handleAttack(dist, char, context, charPos);
-        if (attackRes && attackRes.updatedChar) {
-             return { character: attackRes.updatedChar, soundEvent: attackRes.soundEvent };
+        if (attackRes?.soundEvent) {
+            // Only stop moving during actual spell cast
+            return { character: attackRes.updatedChar!, soundEvent: attackRes.soundEvent };
         }
 
-        // 3. Fallback to Passive Wander
-        const updatedChar = PassiveBehavior.update(char, context).character;
-        // Preserve lastAttackTime just in case
-        return { character: { ...updatedChar, lastAttackTime: char.lastAttackTime }, soundEvent: undefined };
+        // 3. Always wander (sorcerer moves around even when tracking player)
+        const wanderResult = PassiveBehavior.update(char, context);
+        const wanderingChar = wanderResult.character;
+        
+        // If in attack range, face player while wandering
+        if (dist < 15) {
+            const facePlayerRotation = Math.atan2(
+                context.playerPos.x - charPos.x, 
+                context.playerPos.z - charPos.z
+            );
+            return { 
+                character: { 
+                    ...wanderingChar, 
+                    rotation: facePlayerRotation,
+                    lastAttackTime: char.lastAttackTime,
+                    hasSummoned: char.hasSummoned
+                }, 
+                soundEvent: undefined 
+            };
+        }
+
+        // Far away - just wander normally
+        return { 
+            character: { 
+                ...wanderingChar, 
+                lastAttackTime: char.lastAttackTime,
+                hasSummoned: char.hasSummoned
+            }, 
+            soundEvent: undefined 
+        };
     }
 };

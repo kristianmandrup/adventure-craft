@@ -5,7 +5,7 @@ import { PassiveBehavior } from './PassiveBehavior';
 
 export const ZombieBehavior: BehaviorStrategy = {
     update: (char: Character, context: AIContext): { character: Character, soundEvent?: string, spawnRequest?: SpawnRequest } => {
-        const charPos = new THREE.Vector3(...char.position);
+        const charPos = new THREE.Vector3(...char.playerPos!);
         let soundEvent: string | undefined;
         
         // Check Aggro
@@ -46,7 +46,7 @@ export const ZombieBehavior: BehaviorStrategy = {
             return {
                 character: {
                     ...char,
-                    position: [newPos.x, newPos.y, newPos.z],
+                    playerPos: [newPos.x, newPos.y, newPos.z],
                     rotation: Math.atan2(context.playerPos.x - charPos.x, context.playerPos.z - charPos.z),
                     isMoving: true,
                     wanderTarget: null

@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
       plugins: [react(), tailwindcss()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'APP_VERSION': JSON.stringify(process.env.npm_package_version),
       },
       resolve: {
         alias: {
@@ -28,6 +29,17 @@ export default defineConfig(({ mode }) => {
             },
           },
         },
-      }
+      },
+      // Vitest configuration
+      test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: ['./src/test/setup.ts'],
+        include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
+        coverage: {
+          reporter: ['text', 'json', 'html'],
+          exclude: ['node_modules/', 'src/test/'],
+        },
+      },
     };
 });

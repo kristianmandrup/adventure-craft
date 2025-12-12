@@ -23,13 +23,14 @@ interface UseGameAIProps {
   onNotification: (message: string, type: import('../types').NotificationType, subMessage?: string) => void;
   applyKnockback?: (force: THREE.Vector3) => void;
   armor?: number;
+  difficultyMode?: import('../types').GameMode;
 }
 
 // --- Helper Functions ---
 
 const handleSoundEvents = (char: Character, soundEvent: string, playerPos: THREE.Vector3) => {
     try {
-        const dist = char.position ? new THREE.Vector3(...char.position).distanceTo(playerPos) : 20;
+        const dist = char.playerPos ? new THREE.Vector3(...char.playerPos).distanceTo(playerPos) : 20;
         const volumeFactor = Math.max(0, 1 - dist / 30);
         
         switch (soundEvent) {
@@ -52,7 +53,7 @@ const handleSoundEvents = (char: Character, soundEvent: string, playerPos: THREE
 const handleRandomCreatureEffects = (char: Character, playerPos: THREE.Vector3) => {
     if (!char.isEnemy || Math.random() >= 0.005) return;
 
-    const dist = char.position ? new THREE.Vector3(...char.position).distanceTo(playerPos) : 20;
+    const dist = char.playerPos ? new THREE.Vector3(...char.playerPos).distanceTo(playerPos) : 20;
     if (dist < 25) {
         if (char.name.includes('Zombie')) audioManager.playSFX('ZOMBIE_GROAN', Math.max(0.1, 1 - dist / 20));
         if (char.name.includes('Sorcerer')) audioManager.playSFX('SORCERER_LAUGH', Math.max(0.1, 1 - dist / 30));
@@ -64,7 +65,8 @@ const handleRandomCreatureEffects = (char: Character, playerPos: THREE.Vector3) 
 export const useGameAI = ({
   characters, setCharacters, projectiles, setProjectiles, playerPosRef, setPlayerHp, blockMap,
   inventory = [], playerStats = { attackMultiplier: 1, speedMultiplier: 1, defenseReduction: 0 },
-  isLocked, onDebugUpdate, setPlayerHunger, onNotification, applyKnockback, armor
+  isLocked, onDebugUpdate, setPlayerHunger, onNotification, applyKnockback, armor,
+  difficultyMode
 }: UseGameAIProps) => {
   const lastAiUpdate = useRef(0);
 
@@ -144,7 +146,7 @@ export const useGameAI = ({
             }
             nextProjs.push({ ...p, position: nextPos });
          });
-         return hasChanges || nextProjs.length !== prev.length ? nextProjs : prev;
+          return nextProjs;
       });
     }
 
@@ -202,8 +204,8 @@ export const useGameAI = ({
                           onNotification(`${updatedChar.name} hit you for ${finalDamage} damage`, 'COMBAT_DAMAGE');
 
                           // Knockback: Player pushed backwards from enemy
-                          if (applyKnockback && updatedChar.position) {
-                              const enemyPos = new THREE.Vector3(...updatedChar.position);
+                          if (applyKnockback && updatedChar.playerPos) {
+                              const enemyPos = new THREE.Vector3(...updatedChar.playerPos);
                               const pushDir = playerPosRef.current.clone().sub(enemyPos).normalize();
                               // Push up slightly and back
                               pushDir.y = 0.5; 
@@ -235,7 +237,7 @@ export const useGameAI = ({
                              newZombies.push({
                                  ...zombiePrefab,
                                  id,
-                                 position: [spawnPos.x, spawnPos.y, spawnPos.z],
+                                 playerPos: [spawnPos.x, spawnPos.y, spawnPos.z],
                                  rotation: 0,
                                  maxHp: 20,
                                  hp: 20,

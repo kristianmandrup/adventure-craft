@@ -4,7 +4,7 @@ import { AIContext, BehaviorStrategy, COMMON_AI, SpawnRequest } from './BaseBeha
 
 export const PassiveBehavior: BehaviorStrategy = {
     update: (char: Character, context: AIContext): { character: Character, soundEvent?: string, spawnRequest?: SpawnRequest } => {
-        const charPos = new THREE.Vector3(...char.position);
+        const charPos = new THREE.Vector3(...char.playerPos!);
         let wanderTarget = char.wanderTarget;
         let isMoving = false;
         
@@ -27,7 +27,7 @@ export const PassiveBehavior: BehaviorStrategy = {
             return {
                 character: {
                     ...char,
-                    position: [newPos.x, newPos.y, newPos.z],
+                    playerPos: [newPos.x, newPos.y, newPos.z],
                     rotation: Math.atan2(dir.x, dir.z),
                     isMoving: true,
                     wanderTarget

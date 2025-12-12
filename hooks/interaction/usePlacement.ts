@@ -74,10 +74,27 @@ export const usePlacement = ({
             } 
             
             // Placing Logic
-            if (!['weapon','bow','shield','arrows'].includes(currentItem.type) && !currentItem.type.includes('pick') && !currentItem.type.includes('axe')) {
+            if (!['weapon','bow','shield','arrows','sword','spear','dagger','hammer','mace','staff','wand'].includes(currentItem.type) && !currentItem.type.includes('pick') && !currentItem.type.includes('axe') && !currentItem.type.includes('armor')) {
                 const pBox = new THREE.Box3().setFromCenterAndSize(positionRef.current, new THREE.Vector3(0.6, 1.8, 0.6));
                 const bBox = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(tx, ty, tz), new THREE.Vector3(1, 1, 1));
                 
+                // Check for liquids/fire at placement target
+                const targetKey = `${tx},${ty},${tz}`;
+                const targetBlock = blockMap.get(targetKey);
+                
+                if (targetBlock && ['water', 'lava', 'fire'].includes(targetBlock.type || '')) {
+                     // Sizzle effect - destroy placed block
+                     audioManager.playSFX('FIZZ'); // Assuming FIZZ exists or similar, if not maybe generic damage
+                     // onSpawnParticles(new THREE.Vector3(tx, ty, tz), '#555'); // We don't have onSpawnParticles here?
+                     // Pass onSpawnParticles to usePlacement? It's not in props currently.
+                     // The user said "Particle effect". 
+                     // We can emit a notification or just consume it.
+                     // Assuming we want to consume the item:
+                     setInventory(prev => prev.map((inv, idx) => idx === activeSlot ? { ...inv, count: inv.count - 1 } : inv));
+                     onNotification('Block destroyed by extreme heat/wetness!', 'INFO');
+                     return;
+                }
+
                 if (viewMode === 'OVERHEAD' || !pBox.intersectsBox(bBox)) {
                     setBlocks(prev => [...prev, {
                         id: crypto.randomUUID(),

@@ -19,11 +19,14 @@ interface UsePlayerPhysicsProps {
   targetPosRef: React.MutableRefObject<[number, number, number] | null>;
   resetViewTrigger: number;
   playerPosRef: React.MutableRefObject<[number, number, number] | null>;
-  hasMagicBoots: boolean; // New prop
+  hasMagicBoots: boolean;
+  hasSwimmingBoots: boolean;
+  setPlayerHp: React.Dispatch<React.SetStateAction<number>>;
+  worldBounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
 }
 
 export const usePlayerPhysics = ({
-  controlsRef, blockMap, positionRef, rainGroupRef, viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger, playerPosRef, hasMagicBoots
+  controlsRef, blockMap, positionRef, rainGroupRef, viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger, playerPosRef, hasMagicBoots, hasSwimmingBoots, setPlayerHp, worldBounds
 }: UsePlayerPhysicsProps) => {
   const { camera } = useThree();
   const velocity = useRef(new THREE.Vector3(0, 0, 0));
@@ -43,6 +46,11 @@ export const usePlayerPhysics = ({
   // Magic Boots State
   const bootsActiveTime = useRef(0);
   const bootsCooldownEnd = useRef(0);
+  
+  // Swimming/Drowning State
+  const isSwimming = useRef(false);
+  const isDrowning = useRef(false);
+  const drownTimer = useRef(0);
   
   const [camAngle, setCamAngle] = useState({ pitch: 0, yaw: 0 });
   const [debugInfo, setDebugInfo] = useState({ speed: 0, moving: false, locked: false, keys: '', mode: 'ACCELERATION', boost: 'READY' });
@@ -250,6 +258,85 @@ export const usePlayerPhysics = ({
               positionRef.current.copy(result.position);
               velocity.current = result.velocity;
               canJump.current = result.onGround;
+              
+              // World Boundary Clamping
+              if (worldBounds) {
+                positionRef.current.x = Math.max(worldBounds.minX, Math.min(worldBounds.maxX, positionRef.current.x));
+                positionRef.current.z = Math.max(worldBounds.minZ, Math.min(worldBounds.maxZ, positionRef.current.z));
+              }
+              
+              // Water Detection
+              const px = Math.round(positionRef.current.x);
+              const py = Math.round(positionRef.current.y);
+              const pz = Math.round(positionRef.current.z);
+              const waterKey = `${px},${py},${pz}`;
+              const waterBlock = blockMap.get(waterKey);
+              const isInWater = waterBlock?.type === 'water';
+              
+              // Check for water at feet level too
+              const waterKeyFeet = `${px},${py - 1},${pz}`;
+              const waterBlockFeet = blockMap.get(waterKeyFeet);
+              const isOnWater = waterBlockFeet?.type === 'water';
+              
+              if (isInWater || isOnWater) {
+                if (hasSwimmingBoots) {
+                  // Swimming - stay on surface
+                  isSwimming.current = true;
+                  isDrowning.current = false;
+                  drownTimer.current = 0;
+                  // Find water surface (highest water block)
+                  let surfaceY = py;
+                  for (let checkY = py; checkY < py + 5; checkY++) {
+                    const aboveKey = `${px},${checkY + 1},${pz}`;
+                    const aboveBlock = blockMap.get(aboveKey);
+                    if (!aboveBlock || aboveBlock.type !== 'water') {
+                      surfaceY = checkY;
+                      break;
+                    }
+                  }
+                  positionRef.current.y = surfaceY + 0.5;
+                  velocity.current.y = 0;
+                } else {
+                  // No boots - drowning
+                  isSwimming.current = false;
+                  isDrowning.current = true;
+                  drownTimer.current += FIXED_TIME_STEP;
+                  
+                  // Drain HP: 10 per 0.1s = 100 per second
+                  if (drownTimer.current >= 0.1) {
+                    drownTimer.current = 0;
+                    setPlayerHp(prev => Math.max(0, prev - 10));
+                  }
+                  
+                  // Check for bottom (solid block below)
+                  const belowKey = `${px},${py - 1},${pz}`;
+                  const belowBlock = blockMap.get(belowKey);
+                  if (belowBlock && belowBlock.type !== 'water') {
+                    // Hit bottom - instant death
+                    setPlayerHp(0);
+                  }
+                  
+                  // Sink slowly
+                  velocity.current.y = Math.max(velocity.current.y, -2);
+                }
+              } else {
+                isSwimming.current = false;
+                isDrowning.current = false;
+                drownTimer.current = 0;
+                
+                // Shore blocking - check if next position would be water
+                if (!hasSwimmingBoots) {
+                  const nextX = Math.round(positionRef.current.x + velocity.current.x * FIXED_TIME_STEP);
+                  const nextZ = Math.round(positionRef.current.z + velocity.current.z * FIXED_TIME_STEP);
+                  const nextWaterKey = `${nextX},${py},${nextZ}`;
+                  const nextWater = blockMap.get(nextWaterKey);
+                  if (nextWater?.type === 'water') {
+                    // Block movement into water
+                    velocity.current.x = 0;
+                    velocity.current.z = 0;
+                  }
+                }
+              }
               
               // Sync playerPosRef for Minimap
               playerPosRef.current = [positionRef.current.x, positionRef.current.y, positionRef.current.z];

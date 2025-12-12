@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { saveGame } from '../utils/storage';
+import { saveGameToCloud } from '../utils/cloudSaves';
 
 interface UseGameLoopProps {
     gameStarted: boolean;
@@ -8,6 +9,10 @@ interface UseGameLoopProps {
     stateToSave: any;
     getEntityCounts: () => { enemies: number; animals: number; };
     spawnPredefinedCharacter: (prefab: any, count: number, isEnemy?: boolean, isGiant?: boolean) => void;
+    userId: string | null;
+    playerLevel: number;
+    playerXp: number;
+    gameMode: 'CREATIVE' | 'ADVENTURE';
 }
 
 export const useGameLoop = ({
@@ -16,24 +21,43 @@ export const useGameLoop = ({
     playerPosRef,
     stateToSave,
     getEntityCounts,
-    spawnPredefinedCharacter
+    spawnPredefinedCharacter,
+    userId,
+    playerLevel,
+    playerXp,
+    gameMode
 }: UseGameLoopProps) => {
 
-    // Auto-Save Interval (30s)
+    const lastCloudSaveRef = useRef<number>(Date.now());
+    const CLOUD_SAVE_INTERVAL = 60000; // Save to cloud every 60s (less frequent than local)
+
+    // Auto-Save Interval (30s local, 60s cloud)
     useEffect(() => {
         if (!gameStarted || playerHp <= 0) return;
+        
         const interval = setInterval(() => {
             if (playerPosRef.current) {
                 const [x, y, z] = playerPosRef.current;
-                saveGame({
+                const saveData = {
                     ...stateToSave,
                     playerPos: [x, y, z],
                     version: 1
-                });
+                };
+                
+                // Always save locally
+                saveGame(saveData);
+                
+                // Save to cloud less frequently (if authenticated)
+                const now = Date.now();
+                if (userId && now - lastCloudSaveRef.current > CLOUD_SAVE_INTERVAL) {
+                    saveGameToCloud(userId, saveData, playerLevel, playerXp, gameMode);
+                    lastCloudSaveRef.current = now;
+                }
             }
         }, 30000); 
+        
         return () => clearInterval(interval);
-    }, [gameStarted, playerHp, stateToSave]);
+    }, [gameStarted, playerHp, stateToSave, userId, playerLevel, playerXp, gameMode]);
 
     // Random Spawn Interval (10s)
     useEffect(() => {

@@ -46,6 +46,16 @@ export const StartControlsPanel: React.FC = () => {
            <span className="font-mono font-bold bg-white/10 px-3 py-1 rounded text-white border border-white/10">C</span>
          </div>
          
+         <div className="flex items-center justify-between border-b border-white/5 pb-2 hover:bg-white/5 px-2 rounded transition-colors">
+           <span className="text-gray-400 flex items-center gap-3">⚔️ Attack / Mine</span>
+           <span className="font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded">X</span>
+         </div>
+         
+         <div className="flex items-center justify-between border-b border-white/5 pb-2 hover:bg-white/5 px-2 rounded transition-colors">
+           <span className="text-gray-400 flex items-center gap-3">🧱 Build / Place Block</span>
+           <span className="font-mono font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 px-3 py-1 rounded">B</span>
+         </div>
+          
           <div className="flex items-center justify-between hover:bg-white/5 px-2 rounded transition-colors pt-2">
            <span className="text-gray-400 flex items-center gap-3"><RefreshCw size={18} className="text-red-400"/> Respawn / Reset</span>
            <div className="flex gap-2">

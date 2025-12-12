@@ -19,7 +19,9 @@ export const CharacterHealthBar: React.FC<CharacterHealthBarProps> = ({ characte
   
   return (
     <Html position={[0, 2.2, 0]} center style={{ pointerEvents: 'none', whiteSpace: 'nowrap' }} zIndexRange={[100, 0]}>
-      <div style={{ 
+      <div 
+        data-testid="health-bar-container"
+        style={{ 
           display: 'flex', 
           flexDirection: 'column', 
           alignItems: 'center', 
@@ -28,7 +30,9 @@ export const CharacterHealthBar: React.FC<CharacterHealthBarProps> = ({ characte
           borderRadius: '4px',
           backdropFilter: 'blur(2px)'
       }}>
-         <div style={{ 
+         <div 
+             data-testid="health-bar-border"
+             style={{ 
              width: '60px', 
              height: '6px', 
              background: '#333', 
@@ -36,7 +40,9 @@ export const CharacterHealthBar: React.FC<CharacterHealthBarProps> = ({ characte
              borderRadius: '2px', 
              overflow: 'hidden' 
          }}>
-             <div style={{ 
+             <div 
+                 data-testid="health-bar-fill"
+                 style={{ 
                  width: `${(Math.max(0, character.hp) / character.maxHp) * 100}%`, 
                  height: '100%', 
                  background: character.isFriendly ? '#4ade80' : '#ef4444',

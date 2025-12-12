@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getLeaderboard, saveScore, isHighScore, ScoreEntry } from '../utils/storage';
+import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
+import { getGlobalLeaderboard, submitScore, isGlobalHighScore, LeaderboardEntry } from '../utils/cloudLeaderboard';
 
 interface GameOverScreenProps {
   onRestart: () => void;
@@ -8,27 +10,80 @@ interface GameOverScreenProps {
 }
 
 export const GameOverScreen: React.FC<GameOverScreenProps> = ({ onRestart, reason = "You have perished.", score }) => {
-  const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([]);
-  const [isHigh, setIsHigh] = useState(false);
+  // Local leaderboard state
+  const [localLeaderboard, setLocalLeaderboard] = useState<ScoreEntry[]>([]);
+  const [isLocalHigh, setIsLocalHigh] = useState(false);
+  
+  // Cloud leaderboard state
+  const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isGlobalHigh, setIsGlobalHigh] = useState(false);
+  const [isLoadingGlobal, setIsLoadingGlobal] = useState(true);
+  
+  // Form state
   const [name, setName] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Firebase auth
+  const { userId, isLoading: isAuthLoading } = useFirebaseAuth();
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'global' | 'local'>('global');
 
+  // Load local leaderboard
   useEffect(() => {
-    setLeaderboard(getLeaderboard());
-    setIsHigh(isHighScore(score));
+    setLocalLeaderboard(getLeaderboard());
+    setIsLocalHigh(isHighScore(score));
   }, [score]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Load global leaderboard
+  useEffect(() => {
+    const loadGlobal = async () => {
+      setIsLoadingGlobal(true);
+      try {
+        const entries = await getGlobalLeaderboard(10);
+        setGlobalLeaderboard(entries);
+        const isTop = await isGlobalHighScore(score);
+        setIsGlobalHigh(isTop);
+      } catch (error) {
+        console.error('Failed to load global leaderboard:', error);
+      }
+      setIsLoadingGlobal(false);
+    };
+    loadGlobal();
+  }, [score]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    // Save locally
     saveScore(name.trim(), score);
-    setLeaderboard(getLeaderboard());
+    setLocalLeaderboard(getLeaderboard());
+    
+    // Save to cloud if authenticated
+    if (userId) {
+      const success = await submitScore(userId, name.trim(), score);
+      if (success) {
+        // Refresh global leaderboard
+        const entries = await getGlobalLeaderboard(10);
+        setGlobalLeaderboard(entries);
+      }
+    }
+    
     setSubmitted(true);
-    setIsHigh(false); // Hide form
+    setIsLocalHigh(false);
+    setIsGlobalHigh(false);
+    setIsSubmitting(false);
   };
 
+  const showHighScoreForm = (isLocalHigh || isGlobalHigh) && !submitted;
+  const currentLeaderboard = activeTab === 'global' ? globalLeaderboard : localLeaderboard;
+
   return (
-    <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-1000 p-4">
+    <div className="fixed inset-0 z-100 bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-1000 p-4">
       <h1 className="text-6xl md:text-8xl font-black text-red-600 tracking-widest mb-2 drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]" style={{ fontFamily: 'Cinzel, serif' }}>
         GAME OVER
       </h1>
@@ -43,14 +98,42 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({ onRestart, reaso
 
       {/* Leaderboard Section */}
       <div className="bg-white/5 border border-white/10 rounded-xl p-6 w-full max-w-md mb-8 backdrop-blur-sm">
-          <h2 className="text-white text-xl font-bold mb-4 text-center border-b border-white/10 pb-2">LEGENDARY HEROES</h2>
+          {/* Tabs */}
+          <div className="flex border-b border-white/10 mb-4">
+              <button 
+                  onClick={() => setActiveTab('global')}
+                  className={`flex-1 py-2 text-sm font-bold transition-colors ${
+                      activeTab === 'global' 
+                        ? 'text-yellow-400 border-b-2 border-yellow-400' 
+                        : 'text-gray-500 hover:text-gray-300'
+                  }`}
+              >
+                  🌍 GLOBAL
+              </button>
+              <button 
+                  onClick={() => setActiveTab('local')}
+                  className={`flex-1 py-2 text-sm font-bold transition-colors ${
+                      activeTab === 'local' 
+                        ? 'text-yellow-400 border-b-2 border-yellow-400' 
+                        : 'text-gray-500 hover:text-gray-300'
+                  }`}
+              >
+                  💾 LOCAL
+              </button>
+          </div>
+
+          <h2 className="text-white text-xl font-bold mb-4 text-center">
+              {activeTab === 'global' ? 'LEGENDARY HEROES' : 'YOUR RECORDS'}
+          </h2>
           
-          {leaderboard.length === 0 ? (
+          {isLoadingGlobal && activeTab === 'global' ? (
+              <p className="text-center text-gray-500 italic animate-pulse">Loading legends...</p>
+          ) : currentLeaderboard.length === 0 ? (
               <p className="text-center text-gray-500 italic">No legends recorded yet.</p>
           ) : (
               <div className="space-y-2">
-                  {leaderboard.map((entry, idx) => (
-                      <div key={idx} className={`flex justify-between items-center text-sm ${idx === 0 ? 'text-yellow-300 font-bold' : 'text-gray-300'}`}>
+                  {currentLeaderboard.map((entry, idx) => (
+                      <div key={`entry-${idx}`} className={`flex justify-between items-center text-sm ${idx === 0 ? 'text-yellow-300 font-bold' : 'text-gray-300'}`}>
                           <div className="flex items-center gap-3">
                               <span className="w-4">{idx + 1}.</span>
                               <span>{entry.name}</span>
@@ -63,9 +146,11 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({ onRestart, reaso
       </div>
 
       {/* High Score Input */}
-      {isHigh && !submitted && (
+      {showHighScoreForm && (
           <div className="mb-8 w-full max-w-sm animate-pulse-slow">
-              <p className="text-green-400 text-center mb-2 font-bold text-lg">NEW HIGH SCORE!</p>
+              <p className="text-green-400 text-center mb-2 font-bold text-lg">
+                  {isGlobalHigh ? '🏆 NEW GLOBAL HIGH SCORE!' : 'NEW HIGH SCORE!'}
+              </p>
               <form onSubmit={handleSubmit} className="flex gap-2">
                   <input 
                     type="text" 
@@ -75,14 +160,19 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({ onRestart, reaso
                     className="flex-1 bg-black/50 border border-white/30 rounded px-4 py-2 text-white focus:outline-none focus:border-yellow-500"
                     maxLength={15}
                     autoFocus
+                    disabled={isSubmitting}
                   />
                   <button 
                     type="submit"
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded font-bold transition-colors"
+                    disabled={isSubmitting || isAuthLoading}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded font-bold transition-colors disabled:opacity-50"
                   >
-                    SAVE
+                    {isSubmitting ? '...' : 'SAVE'}
                   </button>
               </form>
+              {isAuthLoading && (
+                  <p className="text-gray-500 text-xs text-center mt-2">Connecting to cloud...</p>
+              )}
           </div>
       )}
       
@@ -90,7 +180,7 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({ onRestart, reaso
         onClick={onRestart}
         className="group relative px-8 py-4 bg-transparent border border-white/20 hover:border-white/50 hover:bg-white/5 transition-all duration-300 rounded-lg overflow-hidden"
       >
-        <div className="absolute inset-0 w-0 bg-red-800 transition-all duration-[250ms] ease-out group-hover:w-full opacity-20"></div>
+        <div className="absolute inset-0 w-0 bg-red-800 transition-all duration-250 ease-out group-hover:w-full opacity-20"></div>
         <span className="relative text-white font-bold tracking-[0.2em] text-lg">RESTART LEGEND</span>
       </button>
       

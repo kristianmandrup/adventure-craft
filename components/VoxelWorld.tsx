@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Stars, Cloud, PointerLockControls, Sky, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { Block, Character, Projectile, InventoryItem, DroppedItem, Equipment } from '../types';
+import { Block, Character, Projectile, InventoryItem, DroppedItem, Equipment, GameMode } from '../types';
 import { TextureData } from '../utils/textures';
 import { createBlockMap } from '../utils/physics';
 
@@ -54,6 +54,7 @@ interface VoxelWorldProps {
   portalColor?: string;
   onEnterPortal?: () => void;
   isUnderworld: boolean;
+  difficultyMode?: GameMode;
 }
 
 export const VoxelWorld: React.FC<VoxelWorldProps> = ({ 
@@ -61,7 +62,7 @@ export const VoxelWorld: React.FC<VoxelWorldProps> = ({
   setInventory, inventory, activeSlot, setPlayerHunger, setPlayerHp, respawnTrigger, viewMode, setViewMode,
   targetPosRef, resetViewTrigger, playerPosRef, onQuestUpdate, playerStats, onXpGain, onGoldGain, onDebugUpdate,
   droppedItems, setDroppedItems, onNotification, playerHp, playerHunger, onCharacterInteract, equipment,
-  portalPosition, onEnterPortal, portalColor, isUnderworld
+  portalPosition, onEnterPortal, portalColor, isUnderworld, difficultyMode
 }) => {
   const positionRef = React.useRef<THREE.Vector3>(new THREE.Vector3(0, 10, 0));
   const rainGroupRef = React.useRef<THREE.Group>(null);
@@ -155,6 +156,7 @@ export const VoxelWorld: React.FC<VoxelWorldProps> = ({
          equipment={equipment}
          portalPosition={portalPosition || null}
          onEnterPortal={onEnterPortal || (() => {})}
+         difficultyMode={difficultyMode}
        />
 
        {blocks.map(block => (

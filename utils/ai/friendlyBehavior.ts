@@ -3,7 +3,7 @@ import { Character } from '../../types';
 
 export const updateFriendlyCharacter = (char: Character, playerPos: [number, number, number]): Character => {
     let rotation = char.rotation;
-    let position = char.position;
+    let position = char.playerPos!;
     let isMoving = false;
 
     // Flee Logic
@@ -11,8 +11,8 @@ export const updateFriendlyCharacter = (char: Character, playerPos: [number, num
     
     if (isFleeing) {
         // Calculate direction away from player
-        const dx = char.position[0] - playerPos[0];
-        const dz = char.position[2] - playerPos[2];
+        const dx = char.playerPos![0] - playerPos[0];
+        const dz = char.playerPos![2] - playerPos[2];
         const angle = Math.atan2(dx, dz); // Angle away from player
         
         // Add some jitter
@@ -42,5 +42,5 @@ export const updateFriendlyCharacter = (char: Character, playerPos: [number, num
         }
     }
 
-    return { ...char, rotation, position, isMoving };
+    return { ...char, rotation, playerPos: position, isMoving };
 };

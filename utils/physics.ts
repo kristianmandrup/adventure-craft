@@ -1,14 +1,16 @@
 import * as THREE from 'three';
 import { Block } from '../types';
 
-export const GRAVITY = 18.0;
-export const JUMP_FORCE = 10.0; // Increased for better playability (was 6.5)
-export const SPEED = 3.5;  // Base walk speed (Reduced from 10.0)
-export const MAX_SPRINT_SPEED = 6.0; // Sprint speed (Reduced from 18.0)
+import { PHYSICS, PLAYER } from '../src/constants';
+
+export const GRAVITY = PHYSICS.GRAVITY;
+export const JUMP_FORCE = PHYSICS.JUMP_FORCE;
+export const SPEED = PHYSICS.SPEED;
+export const MAX_SPRINT_SPEED = PHYSICS.MAX_SPRINT_SPEED;
 export const ACCELERATION = 20.0;
 export const DECELERATION = 10.0;
-export const PLAYER_HEIGHT = 1.8;
-export const PLAYER_WIDTH = 0.6;
+export const PLAYER_HEIGHT = PLAYER.HEIGHT;
+export const PLAYER_WIDTH = PLAYER.WIDTH;
 
 // Convert block list to a Map for O(1) collision lookup
 export const createBlockMap = (blocks: Block[]) => {

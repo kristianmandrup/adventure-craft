@@ -1,11 +1,13 @@
 import { useRef, useState, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Block, Character, InventoryItem, Projectile } from '../types';
+import { Block, Character, InventoryItem, Projectile, GameMode } from '../types';
 import { raycastBlock } from '../utils/physics';
 import { useCombat } from './interaction/useCombat';
 import { useMining } from './interaction/useMining';
 import { usePlacement } from './interaction/usePlacement';
+import { useFishing } from './interaction/useFishing';
+import { useCooking } from './interaction/useCooking';
 
 interface UsePlayerInteractionProps {
   blockMap: Map<string, Block>;
@@ -29,11 +31,13 @@ interface UsePlayerInteractionProps {
   setDroppedItems: React.Dispatch<React.SetStateAction<import('../types').DroppedItem[]>>;
   onNotification: (message: string, type: import('../types').NotificationType, subMessage?: string) => void;
   onSpawnParticles: (pos: THREE.Vector3, color: string) => void;
+  difficultyMode?: GameMode;
+  isSwimming?: boolean;
 }
 
 export const usePlayerInteraction = ({
   blockMap, positionRef, inventory, setInventory, activeSlot, setBlocks, setCharacters, setPlayerHunger, viewMode, isLocked, targetPosRef, characters, onQuestUpdate,
-  setProjectiles, playerStats, onXpGain, onGoldGain, setDroppedItems, onNotification, onSpawnParticles
+  setProjectiles, playerStats, onXpGain, onGoldGain, setDroppedItems, onNotification, onSpawnParticles, difficultyMode, isSwimming
 }: UsePlayerInteractionProps) => {
   const { camera, raycaster, pointer } = useThree();
   const [cursorPos, setCursorPos] = useState<[number, number, number] | null>(null);
@@ -42,7 +46,8 @@ export const usePlayerInteraction = ({
 
   // Sub-Hooks
   const { handleAttack } = useCombat({
-      characters, setCharacters, setProjectiles, inventory, setInventory, playerStats, onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems, onSpawnParticles
+      characters, setCharacters, setProjectiles, inventory, setInventory, playerStats, onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems, onSpawnParticles,
+      difficultyMode
   });
 
   const { handleMining } = useMining({
@@ -51,6 +56,14 @@ export const usePlayerInteraction = ({
 
   const { handleInteraction: handlePlace } = usePlacement({
       setBlocks, inventory, setInventory, setPlayerHunger, onNotification, positionRef, viewMode, blockMap, onGoldGain
+  });
+
+  const { handleFishing } = useFishing({
+      isSwimming, setInventory, onNotification
+  });
+
+  const { handleCooking } = useCooking({
+      positionRef, blockMap, setInventory, setDroppedItems, onNotification, onSpawnParticles
   });
 
   const handleInteraction = (isRightClick: boolean) => {
@@ -71,9 +84,15 @@ export const usePlayerInteraction = ({
              const blockHit = raycastBlock(camera.position, dir, blockMap, 5);
              if (blockHit.block) {
                  handleMining(blockHit.block, activeSlot);
+             } else if (isSwimming) {
+                 // 3. Fishing
+                 handleFishing();
+             } else {
+                  // 4. Cooking
+                  handleCooking();
              }
-          }
-       } 
+           }
+        } 
        // Right Click Logic (Place / Eat)
        else if (isRightClick && cursorPos) {
            handlePlace(cursorPos, activeSlot);

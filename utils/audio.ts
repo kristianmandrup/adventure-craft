@@ -16,9 +16,10 @@ export class AudioManager {
     return AudioManager.instance;
   }
 
-  public async init() {
+    public async init() {
     if (!this.ctx) {
-      const AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+      // @ts-ignore
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContext) {
         this.ctx = new AudioContext();
         this.masterGain = this.ctx.createGain();

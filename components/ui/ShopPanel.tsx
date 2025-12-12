@@ -1,5 +1,5 @@
 import React from 'react';
-import { Coins, X, Sword, Shield, Apple, Target, CircleDot, Flame, Axe } from 'lucide-react';
+import { Coins, X, Sword, Shield, Apple, Target, CircleDot, Flame, Axe, Heart, Zap, Swords as SwordsIcon, Waves } from 'lucide-react';
 
 interface ShopItem {
   id: string;
@@ -20,6 +20,10 @@ const SHOP_ITEMS: ShopItem[] = [
   { id: 'armor', name: 'Iron Armor', type: 'iron_armor', price: 150, icon: <Shield size={20} />, description: 'Reduces heavy damage' },
   { id: 'torch', name: 'Torch', type: 'torch', price: 15, icon: <Flame size={20} />, description: 'Light in darkness' },
   { id: 'apple', name: 'Fresh Apple', type: 'apple', price: 5, icon: <Apple size={20} />, description: 'Restores 10 hunger' },
+  { id: 'health_potion', name: 'Health Potion', type: 'health_potion', price: 25, icon: <Heart size={20} className="text-red-400" />, description: 'Restore 50 HP' },
+  { id: 'speed_potion', name: 'Speed Potion', type: 'speed_potion', price: 35, icon: <Zap size={20} className="text-blue-400" />, description: '2x speed for 10s' },
+  { id: 'strength_potion', name: 'Strength Potion', type: 'strength_potion', price: 40, icon: <SwordsIcon size={20} className="text-orange-400" />, description: '2x attack for 10s' },
+  { id: 'swimming_potion', name: 'Swimming Potion', type: 'swimming_potion', price: 30, icon: <Waves size={20} className="text-cyan-400" />, description: 'Water walk for 10s' },
 ];
 
 interface ShopPanelProps {

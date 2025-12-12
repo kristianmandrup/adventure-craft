@@ -34,10 +34,10 @@ export const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({ character,
   useFrame((state) => {
       // Random ambient sounds for enemies
       if (character.isEnemy && Math.random() < 0.002) { // Low chance per frame (~ every 8s)
-          const charPos = new THREE.Vector3(...character.position);
+          const charPos = new THREE.Vector3(...character.playerPos!);
           const dist = charPos.distanceTo(state.camera.position);
           if (dist < 15) {
-              audioManager.playSpatialSFX('GROWL', dist);
+              audioManager.playSpatialSFX('ZOMBIE_GROAN', dist);
           }
       }
   });
@@ -45,7 +45,7 @@ export const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({ character,
   return (
     <group 
         ref={groupRef} 
-        position={new THREE.Vector3(...character.position)} 
+        position={new THREE.Vector3(...character.playerPos!)} 
         rotation={[0, character.rotation, 0]}
         scale={[scale, scale, scale]}
         onPointerUp={(e) => {
