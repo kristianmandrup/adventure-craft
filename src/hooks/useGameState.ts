@@ -1,3 +1,4 @@
+import { audioManager } from '../utils/audio';
 import { useState, useCallback, useEffect } from 'react';
 import { Job, Quest, Character, ChatMessage } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,6 +72,7 @@ export const useGameState = (onXpGain: (amount: number) => void) => {
             if (isComplete) {
                 setQuestMessage("Quest Complete!");
                 onXpGain(100); 
+                try { audioManager.playSFX('UI_ACHIEVEMENT'); } catch(e) {}
                 setTimeout(() => {
                     setQuestMessage(null);
                     generateRandomQuest();

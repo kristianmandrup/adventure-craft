@@ -84,7 +84,7 @@ export const useCombat = ({
                 setInventory(prev => prev.map((inv, idx) => 
                     idx === arrowSlotIndex ? { ...inv, count: inv.count - 1 } : inv
                 ).filter(i => i.count > 0)); 
-                try { audioManager.playSFX('SHOOT'); } catch (e) {}
+                try { audioManager.playSFX('ARROW_SHOOT'); } catch (e) {}
             }
             return true; // Attack performed
         }

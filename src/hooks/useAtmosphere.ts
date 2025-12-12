@@ -1,3 +1,4 @@
+import { audioManager } from '../utils/audio';
 import { useState, useEffect, useMemo } from 'react';
 
 export const useAtmosphere = (isDay: boolean, isRaining: boolean, isUnderworld: boolean) => {
@@ -18,19 +19,27 @@ export const useAtmosphere = (isDay: boolean, isRaining: boolean, isUnderworld: 
   const [lightningFlash, setLightningFlash] = useState(0);
 
   useEffect(() => {
-      if (!isRaining || isUnderworld) {
-          setLightningFlash(0);
-          return;
-      }
-      
-      const interval = setInterval(() => {
-          if (Math.random() < 0.1) { // 10% chance every 2 sec
-              setLightningFlash(2); // Flash intensity
-              setTimeout(() => setLightningFlash(0), 100);
-          }
-      }, 2000);
-      
-      return () => clearInterval(interval);
+    if (!isRaining || isUnderworld) {
+        setLightningFlash(0);
+        audioManager.stopAmbient('RAIN');
+        audioManager.stopAmbient('THUNDER'); // Stop ambient thunder loop if we decide to use it, though existing is one-shot
+        return;
+    }
+    
+    audioManager.playAmbient('RAIN', 0.4);
+
+    const interval = setInterval(() => {
+        if (Math.random() < 0.1) { // 10% chance every 2 sec
+            setLightningFlash(2); // Flash intensity
+            audioManager.playSFX('THUNDER', 0.8);
+            setTimeout(() => setLightningFlash(0), 100);
+        }
+    }, 2000);
+    
+    return () => {
+        clearInterval(interval);
+        audioManager.stopAmbient('RAIN');
+    };
   }, [isRaining, isUnderworld]);
 
   return { fogColor, fogDensity, lightningFlash };

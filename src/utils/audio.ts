@@ -96,6 +96,57 @@ export class AudioManager {
      this.playSFX(category, vol);
   }
 
+  private activeLoops: Map<string, { source: AudioBufferSourceNode, gain: GainNode }> = new Map();
+
+  public async playAmbient(category: SoundCategory, volume: number = 0.5) {
+      await this.init();
+      if (!this.ctx || !this.masterGain) return;
+      if (this.activeLoops.has(category)) return; // Already playing
+
+      const files = SOUND_ASSETS[category];
+      if (!files || files.length === 0) return;
+      
+      const file = files[0]; // Loop first file usually
+      const buffer = await this.loadBuffer(file);
+      if (!buffer) return;
+
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+
+      const gainNode = this.ctx.createGain();
+      gainNode.gain.value = 0; // Start at 0 for fade in
+      
+      source.connect(gainNode);
+      gainNode.connect(this.masterGain);
+      source.start(0);
+      
+      // Fade in
+      gainNode.gain.linearRampToValueAtTime(volume, this.ctx.currentTime + 2);
+
+      this.activeLoops.set(category, { source, gain: gainNode });
+  }
+
+  public stopAmbient(category: SoundCategory) {
+      const active = this.activeLoops.get(category);
+      if (active && this.ctx) {
+          // Fade out
+          active.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 2);
+          setTimeout(() => {
+              active.source.stop();
+              active.source.disconnect();
+              active.gain.disconnect();
+          }, 2000);
+          this.activeLoops.delete(category);
+      }
+  }
+
+  public stopAllAmbient() {
+      for (const cat of this.activeLoops.keys()) {
+          this.stopAmbient(cat as SoundCategory);
+      }
+  }
+
   public speak(text: string, variant: 'BOSS' | 'MERCHANT' | 'NORMAL' = 'NORMAL') {
       const synth = window.speechSynthesis;
       if (!synth) return;

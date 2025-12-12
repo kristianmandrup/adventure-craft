@@ -171,9 +171,13 @@ export const WorldController: React.FC<WorldControllerProps> = ({
              if (added) {
                  pickedUpIds.push(item.id);
                  onNotification(`Picked up ${item.type}`, 'INFO');
-                 import('../utils/audio').then(({ audioManager }) => {
-                     audioManager.playSFX('POP');
-                 });
+                  import('../utils/audio').then(({ audioManager }) => {
+                      if (item.type.includes('magic') || item.type.includes('scroll') || item.type.includes('diamond')) {
+                          audioManager.playSFX('UI_MAGIC_ITEM');
+                      } else {
+                          audioManager.playSFX('POP');
+                      }
+                  });
              }
          }
      });

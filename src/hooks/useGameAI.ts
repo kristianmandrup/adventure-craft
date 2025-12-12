@@ -141,6 +141,7 @@ export const useGameAI = ({
               const finalDamage = Math.max(0, Math.floor(p.damage * (1 - totalDefense)));
               setPlayerHp(h => Math.max(0, h - finalDamage));
               onNotification(`${p.ownerId === 'player' ? 'You hit yourself' : 'Hit by projectile'} for ${finalDamage} damage`, 'COMBAT_DAMAGE');
+              try { audioManager.playSFX('PLAYER_HIT'); } catch (e) {}
               hasChanges = true;
               return;
             }

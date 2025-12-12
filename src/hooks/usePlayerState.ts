@@ -387,7 +387,11 @@ export const usePlayerState = (gameStarted: boolean) => {
 
           setPlayerHunger(h => Math.min(100, h + hungerBonus));
           setPlayerHp(h => Math.min(100, h + hpBonus));
-          try { audioManager.playSFX('EAT'); } catch (e) {}
+          try { 
+              if (type.includes('meat') || type.includes('cooked')) audioManager.playSFX('EAT_MEAT');
+              else if (type.includes('fish')) audioManager.playSFX('EAT_FISH');
+              else audioManager.playSFX('EAT');
+          } catch (e) {}
           return true;
       }
       
