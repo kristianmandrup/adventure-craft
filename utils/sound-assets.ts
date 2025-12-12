@@ -29,6 +29,14 @@ export const SOUND_ASSETS = {
     'sfx/eat-apple-1.mp3',
     'sfx/eat-apple-2.mp3',
   ],
+  EAT_MEAT: [
+    'sfx/eating-meat.mp3',
+    'sfx/eating-meat-2.mp3',
+  ],
+  EAT_FISH: [
+    'sfx/eating-fish.mp3',
+    'sfx/eating-fish-2.mp3',
+  ],
   DRINK: [
     'sfx/drink-1.mp3',
     'sfx/drink-aah.mp3',

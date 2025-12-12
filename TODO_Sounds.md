@@ -1,5 +1,3 @@
-Eating meat
-Eating fish
 Draw bow ready to shoot arrow
 Shoot arrow from bow
 Arrow projectile
@@ -11,4 +9,4 @@ Draw sword ready for combat
 Discovery of treasure chest - gold and magic items
 Discovery of magic portal - excitement and mystery ambience
 Discovery of magic item - excitement ambience
-New level achievement - celebration ambience
+New level achievement - celebration and hope ambience

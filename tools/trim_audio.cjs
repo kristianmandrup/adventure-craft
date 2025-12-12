@@ -30,7 +30,7 @@ fs.readdir(SOURCE_DIR, (err, files) => {
         // -y (overwrite)
         
         const fadeStart = DURATION - FADE_OUT;
-        const cmd = `ffmpeg -i "${inputPath}" -t ${DURATION} -af "afade=t=out:st=${fadeStart}:d=${FADE_OUT}" -y "${outputPath}"`;
+        const cmd = `/opt/homebrew/bin/ffmpeg -i "${inputPath}" -t ${DURATION} -af "afade=t=out:st=${fadeStart}:d=${FADE_OUT}" -y "${outputPath}"`;
 
         console.log(`Processing ${file}...`);
         exec(cmd, (error, stdout, stderr) => {

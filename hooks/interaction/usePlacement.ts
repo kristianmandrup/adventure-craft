@@ -55,15 +55,20 @@ export const usePlacement = ({
             // I'll need to update UsePlacementProps.
             
             // Eating/Drinking Logic
-            if (currentItem.type === 'meat' || currentItem.type === 'apple' || currentItem.type === 'potion') {
+            if (currentItem.type === 'meat' || currentItem.type === 'apple' || currentItem.type === 'potion' || currentItem.type === 'fish') {
                 const isDrink = currentItem.type === 'potion';
-                const hungerRefill = currentItem.type === 'meat' ? 20 : 10;
-                // If potion, maybe restore health instead? But usePlacement only has setPlayerHunger.
-                // Assuming potion restores hunger for now or just consumed.
-                // Logic says: setPlayerHunger...
+                const hungerRefill = (currentItem.type === 'meat' || currentItem.type === 'fish') ? 20 : 10;
+                
                 setPlayerHunger(h => Math.min(100, h + hungerRefill));
                 setInventory(prev => prev.map((inv, idx) => idx === activeSlot ? { ...inv, count: inv.count - 1 } : inv));
-                try { audioManager.playSFX(isDrink ? 'DRINK' : 'EAT'); } catch (e) {}
+                
+                try { 
+                    if (isDrink) audioManager.playSFX('DRINK');
+                    else if (currentItem.type === 'meat') audioManager.playSFX('EAT_MEAT');
+                    else if (currentItem.type === 'fish') audioManager.playSFX('EAT_FISH');
+                    else audioManager.playSFX('EAT');
+                } catch (e) {}
+                
                 onNotification(`You consumed ${currentItem.type}`, 'INFO');
                 return;
             } 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { InventoryItem } from '../types';
+import { audioManager } from '../utils/audio';
 
 export const usePlayerState = (gameStarted: boolean) => {
   const [playerHp, setPlayerHp] = useState(100);
@@ -13,6 +14,15 @@ export const usePlayerState = (gameStarted: boolean) => {
   
   const playerPosRef = useRef<[number, number, number] | null>(null);
   const targetPosRef = useRef<[number, number, number] | null>(null);
+
+  // Equip Sound Logic
+  useEffect(() => {
+     if (!gameStarted) return;
+     const item = inventory[activeSlot];
+     if (item && (item.type === 'weapon' || item.type.includes('sword') || item.type === 'bow')) {
+         try { audioManager.playSFX('DRAW_SWORD'); } catch (e) {}
+     }
+  }, [activeSlot, inventory, gameStarted]);
 
   // XP & Economy
   const [playerXp, setPlayerXp] = useState(0);
