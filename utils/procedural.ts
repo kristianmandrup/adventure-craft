@@ -73,6 +73,11 @@ const generateTree = (x: number, y: number, z: number, add: (x: number, y: numbe
     
     // Wood blocks have 50 HP (5-10 hits with axe doing 5-10 damage)
     const WOOD_HP = 50;
+    
+    // Apple Logic: 10% of trees have apples
+    let hasApples = Math.random() < 0.1;
+    // Apple density per leaf if tree has apples
+    const appleDensity = 0.15; 
 
     if (treeType < 0.33) {
         // Oak (Classic) - 30% smaller
@@ -88,8 +93,7 @@ const generateTree = (x: number, y: number, z: number, add: (x: number, y: numbe
                 for (let lz = z - radius; lz <= z + radius; lz++) {
                     if (Math.abs(lx - x) + Math.abs(lz - z) + Math.abs(ly - (leafStart + 1)) <= radius + 1) {
                         if (lx !== x || lz !== z || ly > y + trunkH) {
-                             // Apple Chance
-                             if (Math.random() < 0.1) add(lx, ly, lz, '#ef4444', 'apple'); // Apple block
+                             if (hasApples && Math.random() < appleDensity) add(lx, ly, lz, '#ef4444', 'apple');
                              else add(lx, ly, lz, '#15803d', 'leaf');
                         }
                     }
@@ -97,27 +101,36 @@ const generateTree = (x: number, y: number, z: number, add: (x: number, y: numbe
             }
         }
     } else if (treeType < 0.66) {
-        // Pine (Cone) - 30% smaller
-        const trunkH = Math.floor((4 + heightMod + Math.floor(Math.random() * 2)) * 0.7);
+        // Pine (Cone) - TALLER now
+        // Base height 6-10 instead of 4
+        // Height mod adds up to 4 more.
+        const trunkH = Math.floor((6 + heightMod + Math.floor(Math.random() * 3))); 
         for (let i = 1; i <= trunkH; i++) add(x, y + i, z, '#271c19', 'wood', WOOD_HP); // Darker wood
 
-        let currentRadius = size > 0.6 ? 3 : 2;
+        // NARROWER but taller
+        let currentRadius = size > 0.5 ? 2.5 : 1.5; 
         let ly = y + 2;
-        while (currentRadius >= 0) {
-             for (let lx = x - currentRadius; lx <= x + currentRadius; lx++) {
-                 for (let lz = z - currentRadius; lz <= z + currentRadius; lz++) {
-                     if ((lx !== x || lz !== z) && (Math.abs(lx-x) + Math.abs(lz-z) <= currentRadius + 0.5)) {
-                        if (Math.random() < 0.1) add(lx, ly, lz, '#ef4444', 'apple');
-                        else add(lx, ly, lz, '#064e3b', 'leaf'); // Darker leaf
+        // Extend leaves lower down
+        
+        // Loop up to trunk top
+        while (ly <= y + trunkH + 1) {
+             const r = Math.max(0, currentRadius * (1 - (ly - (y+2))/(trunkH)));
+             const intR = Math.ceil(r);
+             
+             for (let lx = x - intR; lx <= x + intR; lx++) {
+                 for (let lz = z - intR; lz <= z + intR; lz++) {
+                     // Circular cone check
+                     if ((lx !== x || lz !== z) && (Math.sqrt((lx-x)**2 + (lz-z)**2) <= r + 0.5)) {
+                         // No apples on Pine
+                         add(lx, ly, lz, '#064e3b', 'leaf'); 
                      }
                  }
              }
              ly++;
-             if (ly % 2 === 0) currentRadius--;
         }
-        add(x, ly, z, '#064e3b', 'leaf'); // Top
+        add(x, y + trunkH + 2, z, '#064e3b', 'leaf'); // Top tip
     } else {
-        // Birch (Tall, Thin, Pale) - 30% smaller
+        // Birch (Tall, Thin, Pale)
         const trunkH = Math.floor((5 + heightMod + Math.floor(Math.random() * 3)) * 0.7);
         for (let i = 1; i <= trunkH; i++) add(x, y + i, z, '#e5e5e5', 'wood', WOOD_HP); // White wood
         
@@ -128,7 +141,7 @@ const generateTree = (x: number, y: number, z: number, add: (x: number, y: numbe
                  for (let lz = z - 2; lz <= z + 2; lz++) {
                      if (Math.abs(lx-x) <= 1 && Math.abs(lz-z) <= 1 && Math.random() > 0.2) {
                          if (lx !== x || lz !== z || ly > y + trunkH) {
-                            if (Math.random() < 0.1) add(lx, ly, lz, '#ef4444', 'apple');
+                            if (hasApples && Math.random() < appleDensity) add(lx, ly, lz, '#ef4444', 'apple');
                             else add(lx, ly, lz, '#84cc16', 'leaf'); // Lime leaf
                          }
                      }

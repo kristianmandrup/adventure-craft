@@ -17,6 +17,7 @@ const SHOP_ITEMS: ShopItem[] = [
   { id: 'bow', name: 'Hunter Bow', type: 'bow', price: 75, icon: <Target size={20} />, description: 'Ranged attacks' },
   { id: 'arrows', name: 'Arrows (x10)', type: 'arrows', price: 20, icon: <CircleDot size={20} />, description: 'Ammunition for bow' },
   { id: 'shield', name: 'Steel Shield', type: 'shield', price: 40, icon: <Shield size={20} />, description: 'Doubles defense' },
+  { id: 'armor', name: 'Iron Armor', type: 'iron_armor', price: 150, icon: <Shield size={20} />, description: 'Reduces heavy damage' },
   { id: 'torch', name: 'Torch', type: 'torch', price: 15, icon: <Flame size={20} />, description: 'Light in darkness' },
   { id: 'apple', name: 'Fresh Apple', type: 'apple', price: 5, icon: <Apple size={20} />, description: 'Restores 10 hunger' },
 ];

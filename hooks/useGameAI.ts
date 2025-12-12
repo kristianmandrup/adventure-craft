@@ -22,6 +22,7 @@ interface UseGameAIProps {
   setPlayerHunger?: React.Dispatch<React.SetStateAction<number>>;
   onNotification: (message: string, type: import('../types').NotificationType, subMessage?: string) => void;
   applyKnockback?: (force: THREE.Vector3) => void;
+  armor?: number;
 }
 
 // --- Helper Functions ---
@@ -63,7 +64,7 @@ const handleRandomCreatureEffects = (char: Character, playerPos: THREE.Vector3) 
 export const useGameAI = ({
   characters, setCharacters, projectiles, setProjectiles, playerPosRef, setPlayerHp, blockMap,
   inventory = [], playerStats = { attackMultiplier: 1, speedMultiplier: 1, defenseReduction: 0 },
-  isLocked, onDebugUpdate, setPlayerHunger, onNotification, applyKnockback
+  isLocked, onDebugUpdate, setPlayerHunger, onNotification, applyKnockback, armor
 }: UseGameAIProps) => {
   const lastAiUpdate = useRef(0);
 
@@ -130,13 +131,12 @@ export const useGameAI = ({
                   return;
               }
 
-              const shieldBonus = (hasShield || hasMagicShield) ? 0.5 : 0; // Half damage if shield equipped (even if not blocked completely? Plan said "Double Protection" for magic shield)
-              // User said: "Magic shield grants double protection". Normal shield "20% chance to block". 
-              // AND "Shield system against attacks... half damage".
-              // So: 20% Chance full block. If fail, 50% reduction? 
+              const shieldBonus = (hasShield || hasMagicShield) ? 0.5 : 0; 
               
-              const totalDefense = playerStats.defenseReduction + shieldBonus;
-              const finalDamage = Math.floor(p.damage * (1 - totalDefense));
+              const armorReduction = (armor || 0) / 100; // 10 armor = 10% reduction
+              const totalDefense = Math.min(0.9, playerStats.defenseReduction + shieldBonus + armorReduction);
+              
+              const finalDamage = Math.max(0, Math.floor(p.damage * (1 - totalDefense)));
               setPlayerHp(h => Math.max(0, h - finalDamage));
               onNotification(`${p.ownerId === 'player' ? 'You hit yourself' : 'Hit by projectile'} for ${finalDamage} damage`, 'COMBAT_DAMAGE');
               hasChanges = true;
@@ -171,7 +171,8 @@ export const useGameAI = ({
                  soundEvent = res.soundEvent;
                  spawnRequest = res.spawnRequest;
              } else if (char.isFriendly) {
-                 updatedChar = updateFriendlyCharacter(char);
+                 const pPos = playerPosRef.current;
+                 updatedChar = updateFriendlyCharacter(char, [pPos.x, pPos.y, pPos.z]);
              }
 
              if (soundEvent) {
@@ -193,8 +194,10 @@ export const useGameAI = ({
                           // Accuracy Logic (Melee usually hits, but maybe simpler dodge?)
                           // Check defense
                           const shieldBonus = (hasShield || hasMagicShield) ? 0.5 : 0;
-                          const totalDefense = playerStats.defenseReduction + shieldBonus;
-                          const finalDamage = Math.floor(damage * (1 - totalDefense));
+                          const armorReduction = (armor || 0) / 100;
+                          const totalDefense = Math.min(0.9, playerStats.defenseReduction + shieldBonus + armorReduction);
+                          
+                          const finalDamage = Math.max(0, Math.floor(damage * (1 - totalDefense)));
                           setPlayerHp(h => Math.max(0, h - finalDamage));
                           onNotification(`${updatedChar.name} hit you for ${finalDamage} damage`, 'COMBAT_DAMAGE');
 

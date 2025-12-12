@@ -2,7 +2,7 @@ import React from 'react';
 import { Play, RotateCcw } from 'lucide-react';
 
 interface StartTitlePanelProps {
-  onStart: () => void;
+  onStart: (mode: 'CREATIVE' | 'ADVENTURE') => void;
   onContinue?: () => void;
   hasSave?: boolean;
 }
@@ -38,13 +38,21 @@ export const StartTitlePanel: React.FC<StartTitlePanelProps> = ({ onStart, onCon
            )}
 
            <button 
-             onClick={onStart}
-             className={`group relative px-8 py-5 ${hasSave ? 'bg-black/50 border border-white/20 text-white hover:bg-white/10' : 'bg-white text-black hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)]'} font-bold text-xl rounded-xl overflow-hidden transition-all active:scale-95 flex-1`}
+             onClick={() => onStart('ADVENTURE')}
+             className={`group relative px-6 py-5 ${hasSave ? 'bg-black/50 border border-white/20 text-white hover:bg-white/10' : 'bg-white text-black hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)]'} font-bold text-xl rounded-xl overflow-hidden transition-all active:scale-95 flex-1`}
            >
-             <span className="relative z-10 flex items-center justify-center gap-3">
-               {hasSave ? 'NEW GAME' : 'START ADVENTURE'} {!hasSave && <div className="w-3 h-3 bg-green-600 rounded-full animate-pulse"/>}
+             <span className="relative z-10 flex items-center justify-center gap-2">
+               ADVENTURE
              </span>
-             {!hasSave && <div className="absolute inset-0 bg-gradient-to-r from-blue-300 to-green-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />}
+           </button>
+
+           <button 
+             onClick={() => onStart('CREATIVE')}
+             className={`group relative px-6 py-5 bg-black/50 border border-white/20 text-white hover:bg-white/10 font-bold text-xl rounded-xl overflow-hidden transition-all active:scale-95 flex-1`}
+           >
+             <span className="relative z-10 flex items-center justify-center gap-2">
+               CREATIVE
+             </span>
            </button>
        </div>
        <p className="mt-4 text-sm text-gray-500 font-mono pl-1">

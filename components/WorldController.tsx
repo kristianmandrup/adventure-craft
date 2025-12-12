@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Block, Character, Projectile, InventoryItem } from '../types';
@@ -6,6 +6,9 @@ import { usePlayerPhysics } from '../hooks/usePlayerPhysics';
 import { usePlayerInteraction } from '../hooks/usePlayerInteraction';
 import { useGameAI } from '../hooks/useGameAI';
 import { HandWeapon } from './weapons/HandWeapon';
+import { Shield } from './weapons/Shield';
+import { PlayerMesh } from './PlayerMesh';
+import { useFrame, useThree } from '@react-three/fiber';
 
 interface WorldControllerProps {
   blockMap: Map<string, Block>;
@@ -36,9 +39,13 @@ interface WorldControllerProps {
   onDebugUpdate?: (info: any) => void;
   droppedItems: import('../types').DroppedItem[];
   setDroppedItems: React.Dispatch<React.SetStateAction<import('../types').DroppedItem[]>>;
-  onNotification: (message: string, type: 'info' | 'success' | 'warning' | 'error', subMessage?: string) => void;
+  onNotification: (message: string, type: import('../types').NotificationType, subMessage?: string) => void;
   playerHp: number;
   playerHunger: number;
+  onSpawnParticles: (pos: THREE.Vector3, color: string) => void;
+  equipment: import('../types').Equipment;
+  portalPosition: [number, number, number] | null;
+  onEnterPortal: () => void;
 }
 
 export const WorldController: React.FC<WorldControllerProps> = ({ 
@@ -46,156 +53,153 @@ export const WorldController: React.FC<WorldControllerProps> = ({
   characters, setCharacters, projectiles, setProjectiles, controlsRef, setIsLocked, setPlayerHunger, setPlayerHp, respawnTrigger,
   viewMode, setViewMode, targetPosRef, resetViewTrigger, playerPosRef, onQuestUpdate,
   playerStats, onXpGain, onGoldGain, onDebugUpdate, droppedItems, setDroppedItems, onNotification,
-  playerHp, playerHunger
+  playerHp, playerHunger, onSpawnParticles, equipment, portalPosition, onEnterPortal
 }) => {
 
-  // ... (existing effects)
+  const cameraFollowerRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
 
-  // Item Pickup Logic
-  useEffect(() => {
-    if (!positionRef.current) return;
-    const playerPos = positionRef.current;
-    
-    // Check collisions with dropped items
-    const pickupRadius = 2.0;
-    const pickedUpParams: string[] = [];
-    
-    const remainingItems = droppedItems.filter(item => {
-        const dx = item.position.x - playerPos.x;
-        const dy = item.position.y - playerPos.y;
-        const dz = item.position.z - playerPos.z;
-        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        
-        if (dist < pickupRadius) {
-            pickedUpParams.push(item.id);
-            // Add to inventory
-            setInventory(prev => {
-               const existing = prev.find(i => i.type === item.type);
-               if (existing) return prev.map(i => i.type === item.type ? { ...i, count: i.count + item.count } : i);
-               return [...prev, { type: item.type, count: item.count, color: item.color }];
-            });
-            // NOTIFICATION: Pickup
-            onNotification(`You picked up ${item.count} ${item.type}`, 'success');
-            return false; // Remove from world
-        }
-        return true;
-    });
-    
-    if (pickedUpParams.length > 0) {
-        setDroppedItems(remainingItems);
-    }
-  }, [positionRef.current, droppedItems, setInventory, setDroppedItems, onNotification]); 
-  // Note: limiting dependency on droppedItems might cause loop if not careful, but filtering creates new array only on change
+   // Interaction Hook
+  const hasMagicBoots = equipment?.feet?.type === 'magic_boots';
 
-  // Keyboard listener for View Mode Toggle
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'KeyV') {
-        setViewMode(prev => {
-          if (prev === 'FP') return 'TP';
-          if (prev === 'TP') return 'OVERHEAD';
-          return 'FP';
-        });
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [setViewMode]);
-
-  const hasMagicBoots = inventory.some(i => i.type === 'magic_boots');
-
-  const { isLocked: isLockedRef, camAngle, debugInfo, applyKnockback } = usePlayerPhysics({ 
+  const { isLocked: isLockedRef, camAngle, debugInfo, applyKnockback, velocityRef } = usePlayerPhysics({ 
     controlsRef, blockMap, positionRef, rainGroupRef,
     viewMode, setIsLocked, respawnTrigger, targetPosRef, resetViewTrigger, playerPosRef,
     hasMagicBoots
   });
 
-  // Interaction Hook
+
+
   const { cursorPos, armRef, isAttacking } = usePlayerInteraction({
-    blockMap,
-    positionRef,
-    inventory,
-    setInventory,
-    activeSlot,
-    setBlocks,
-    setCharacters,
-    setPlayerHunger,
-    viewMode,
-    isLocked: isLockedRef,
-    targetPosRef,
-    characters,
-    onQuestUpdate,
-    setProjectiles,
-    playerStats,
-    onXpGain,
-    onGoldGain,
-    camera: controlsRef.current?.getObject(),
-    setDroppedItems,
-    onNotification
+    blockMap, positionRef, inventory, setInventory, activeSlot, setBlocks,
+    setCharacters, setPlayerHunger, viewMode, isLocked: isLockedRef, targetPosRef,
+    characters, onQuestUpdate, setProjectiles, playerStats, onXpGain, onGoldGain,
+    camera: controlsRef.current?.getObject(), setDroppedItems, onNotification, onSpawnParticles
   });
 
-  // Game AI
-  useGameAI({ 
-    characters, setCharacters, projectiles, setProjectiles, playerPosRef: positionRef, setPlayerHp, blockMap, inventory, playerStats, isLocked: isLockedRef, onDebugUpdate, setPlayerHunger, onNotification,
-    applyKnockback
+  useGameAI({
+     characters, setCharacters, projectiles, setProjectiles, playerPosRef: positionRef,
+     setPlayerHp, armor: equipment?.chest?.type === 'iron_armor' ? 10 : 0,
+     blockMap, isLocked: isLockedRef, onNotification
   });
-  
-  // Debug Update
-  useEffect(() => {
-    if (onDebugUpdate && debugInfo) {
-       onDebugUpdate({ ...debugInfo, viewMode });
-    }
-  }, [debugInfo, onDebugUpdate, viewMode]);
-
-  // Status Warnings
-  const lastHungerWarn = React.useRef(0);
-  const lastHpWarn = React.useRef(0);
 
   useEffect(() => {
-    // Hunger Warnings
-    if (setPlayerHunger) {
-        // Levels: 50, 25, 10
-        if (playerHunger <= 10 && lastHungerWarn.current > 10) {
-            onNotification("You are starving. Find and eat food quick!", "error");
-        } else if (playerHunger <= 25 && lastHungerWarn.current > 25) {
-             onNotification("You are getting very hungry", "warning");
-        } else if (playerHunger <= 50 && lastHungerWarn.current > 50) {
-             onNotification("You are getting hungry", "info");
-        }
-        lastHungerWarn.current = playerHunger;
-    }
+     if(onDebugUpdate && debugInfo) onDebugUpdate(debugInfo);
+  }, [debugInfo, onDebugUpdate]);
 
-    // Health Warnings
-    if (setPlayerHp) {
-        const hpPercent = (playerHp / 100) * 100; // Assuming 100 max
-        if (hpPercent <= 25 && lastHpWarn.current > 25) {
-            onNotification("You are bleeding to death", "error");
-        } else if (hpPercent <= 50 && lastHpWarn.current > 50) {
-            onNotification("You are severely damaged", "warning");
+    // Portal Interaction
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 'X' to enter portal
+      if ((e.key === 'x' || e.key === 'X') && portalPosition && playerPosRef?.current) {
+        const [px, py, pz] = playerPosRef.current;
+        const [tx, ty, tz] = portalPosition;
+        const dist = Math.sqrt((px - tx) ** 2 + (pz - tz) ** 2);
+        
+        if (dist < 5) {
+          import('../utils/audio').then(({ audioManager }) => {
+              audioManager.playSFX('PORTAL_OPENING');
+              audioManager.playSFX('PORTAL_ACTIVATED');
+          });
+          onEnterPortal();
         }
-        lastHpWarn.current = hpPercent;
-    }
-  }, [playerHunger, playerHp, onNotification, setPlayerHunger, setPlayerHp]);
+      }
+    };
 
-  const activeItem = inventory[activeSlot];
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [portalPosition, onEnterPortal, playerPosRef]);
+
+  // Player Damage Particles
+  const prevHpRef = useRef(playerHp);
+  useEffect(() => {
+      if (playerHp < prevHpRef.current) {
+          // Player took damage
+          if (playerPosRef?.current) {
+               import('../utils/audio').then(({ audioManager }) => {
+                 audioManager.playSFX('PLAYER_HIT'); 
+               });
+               const [x,y,z] = playerPosRef.current;
+               // Spawn blood particles
+               onSpawnParticles(new THREE.Vector3(x, y + 1, z), '#ff0000');
+          }
+      }
+      prevHpRef.current = playerHp;
+  }, [playerHp, playerPosRef, onSpawnParticles]);
+
+  // Sync FP Arms with Camera AND TP Mesh with Position
+  const playerMeshRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+     if (viewMode === 'FP' && cameraFollowerRef.current) {
+         cameraFollowerRef.current.position.copy(camera.position);
+         cameraFollowerRef.current.quaternion.copy(camera.quaternion);
+     }
+     
+     if (viewMode !== 'FP' && playerMeshRef.current) {
+         playerMeshRef.current.position.copy(positionRef.current);
+         // Optional: Rotate player mesh to face camera or velocity?
+         // For now just position. Rotation is handled by AnimatedCharacter usually, but PlayerMesh is simple.
+         // Let's rotate to face direction of movement if moving?
+         if (velocityRef.current.length() > 0.1) {
+             const angle = Math.atan2(velocityRef.current.x, velocityRef.current.z);
+             playerMeshRef.current.rotation.y = angle;
+         }
+     }
+  });
+
+  const activeHotbarItem = inventory[activeSlot];
+  const visualHandItem = activeHotbarItem || equipment?.mainHand;
+  const hasShield = equipment?.offHand?.type.includes('shield');
 
   return (
     <group>
       {viewMode === 'FP' && (
-        <group ref={armRef} position={[positionRef.current.x, positionRef.current.y, positionRef.current.z]}>
-           {/* Arm Base */}
-           <mesh position={[0.35, -0.25, -0.4]} rotation={[-0.2, -0.1, 0]}>
-             <boxGeometry args={[0.08, 0.08, 0.4]} />
-             <meshStandardMaterial color="#eecfa1" />
-           </mesh>
-           
-           {/* Hand/Item */}
-           <group position={[0.35, -0.25, -0.7]} rotation={[0, 0, 0]}>
-              <HandWeapon activeItem={activeItem} />
-           </group>
+        <group ref={cameraFollowerRef}>
+            {/* Right Arm (Weapon) */}
+            <group ref={armRef} position={[0.3, -0.3, -0.5]}>
+               <mesh position={[0, -0.1, 0.2]} rotation={[-0.2, -0.1, 0]}>
+                 <boxGeometry args={[0.08, 0.08, 0.4]} />
+                 <meshStandardMaterial color="#eecfa1" />
+               </mesh>
+               <group position={[0, -0.1, -0.1]} rotation={[0, 0, 0]}>
+                  <HandWeapon activeItem={visualHandItem} />
+               </group>
+            </group>
+
+             {/* Left Arm (Shield) */}
+            <group position={[-0.3, -0.3, -0.5]}>
+               {hasShield && (
+                   <>
+                       <mesh position={[0, -0.1, 0.2]} rotation={[-0.2, 0.1, 0]}>
+                           <boxGeometry args={[0.08, 0.08, 0.4]} />
+                           <meshStandardMaterial color="#eecfa1" />
+                       </mesh>
+                       <group position={[0, -0.05, -0.1]} rotation={[0, -0.2, 0]}>
+                           <Shield />
+                       </group>
+                   </>
+               )}
+            </group>
         </group>
       )}
-
+      
+      {/* 3rd Person Mesh */}
+      {viewMode !== 'FP' && (
+          <group ref={(ref) => {
+              // Sync position in useFrame, but we need a ref to the group.
+              // We can define a new ref or just use an inline callback?
+              // Better to use a dedicated ref defined at top level for clarity, but I'll use a local ref or just let PlayerMesh handle it?
+              // No, PlayerMesh is inside this group.
+              // I will use a dedicated ref `playerMeshRef`.
+              if (ref) {
+                 // Attach ref in render
+                 (playerMeshRef.current as any) = ref;
+              }
+          }}>
+              <PlayerMesh equipment={equipment} velocityRef={velocityRef} />
+          </group>
+      )}
     </group>
   );
 };

@@ -67,6 +67,8 @@ export const SOUND_ASSETS = {
     'sfx/portal-mystical.mp3',
     'sfx/portal-opening.mp3',
   ],
+  PORTAL_OPENING: ['sfx/portal-opening.mp3'],
+  PORTAL_ACTIVATED: ['sfx/portal-activated.mp3'],
 
   // Environment
   THUNDER: ['sfx/thunder-lightning.mp3'],
@@ -105,8 +107,10 @@ export const SOUND_ASSETS = {
   GENERIC_DEATH: [
     'sfx/death-1.mp3',
     'sfx/death-2.mp3',
+    'sfx/death-2.mp3',
     'sfx/death-3.mp3',
   ],
+  PLAYER_HIT: ['sfx/punch-hit.mp3'],
 };
 
 export type SoundCategory = keyof typeof SOUND_ASSETS;

@@ -24,7 +24,7 @@ export interface CharacterPart {
 
 export interface Character {
   id: string;
-  position: [number, number, number]; // World position
+  playerPos?: [number, number, number]; // World position
   rotation: number; // Y-axis rotation in radians
   parts: CharacterPart[]; // Animated parts
   name: string;
@@ -39,6 +39,29 @@ export interface Character {
   lastAttackTime?: number;
   wanderTarget?: THREE.Vector3 | null; // For idle AI
   hasSummoned?: boolean; // For Sorcerer
+  lastDamagedTime?: number; // For fleeing logic
+}
+
+export interface GameSaveState {
+  version: number;
+  timestamp: number;
+  playerHp: number;
+  playerHunger: number;
+  playerXp: number;
+  playerLevel: number;
+  playerGold: number;
+  inventory: InventoryItem[];
+  equipment: Equipment;
+  blocks: Block[];
+  characters: Character[];
+  droppedItems: DroppedItem[];
+  currentQuest: Quest | null;
+  questMessage: string | null;
+  gameStarted: boolean;
+  isDay: boolean;
+  expansionLevel: number;
+  playerPos: [number, number, number];
+  gameMode?: 'CREATIVE' | 'ADVENTURE';
 }
 
 export interface Projectile {
@@ -55,6 +78,16 @@ export interface InventoryItem {
   type: string;
   count: number;
   color: string;
+}
+
+export type EquipmentSlot = 'head' | 'chest' | 'feet' | 'mainHand' | 'offHand';
+
+export interface Equipment {
+  head: InventoryItem | null;
+  chest: InventoryItem | null;
+  feet: InventoryItem | null;
+  mainHand: InventoryItem | null;
+  offHand: InventoryItem | null;
 }
 
 export interface GenerationResponse {

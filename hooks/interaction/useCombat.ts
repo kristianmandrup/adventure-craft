@@ -16,6 +16,7 @@ interface UseCombatProps {
     onGoldGain: (amount: number) => void;
     onNotification: (message: string, type: import('../../types').NotificationType, subMessage?: string) => void;
     setDroppedItems: React.Dispatch<React.SetStateAction<import('../../types').DroppedItem[]>>;
+    onSpawnParticles: (pos: THREE.Vector3, color: string) => void;
 }
 
 const ENEMY_XP: Record<string, number> = {
@@ -28,7 +29,7 @@ const ENEMY_GOLD: Record<string, [number, number]> = {
 
 export const useCombat = ({
     characters, setCharacters, setProjectiles, inventory, setInventory, playerStats,
-    onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems
+    onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems, onSpawnParticles
 }: UseCombatProps) => {
 
     const spawnDrop = (position: THREE.Vector3, type: string, count: number, color: string) => {
@@ -152,47 +153,67 @@ export const useCombat = ({
                             let dropMsg = '';
                             let dropsText = [];
                             
-                            if (c.isEnemy) {
-                               // Simplified Drop Logic
-                               const drops = ['meat', 'apple', 'wood', 'stone'];
-                               // 50% chance for item
-                               let droppedItemType = null;
-                               if (Math.random() < 0.5) {
-                                   droppedItemType = drops[Math.floor(Math.random() * drops.length)];
-                                   // Specific Animal Drops
-                                   if (type.includes('pig') || type.includes('sheep') || type.includes('cow')) droppedItemType = 'meat';
+                            // Check if enemy or animal
+                            const isAnimal = ['sheep', 'cow', 'pig', 'chicken', 'fish'].some(a => type.includes(a));
+                            
+                            if (c.isEnemy || isAnimal) {
+                                // Specific Animal Drops
+                                if (isAnimal) {
+                                   let meatType = 'meat';
+                                   let color = '#ef4444';
+                                   let count = 1;
                                    
-                                   spawnDrop(new THREE.Vector3(...c.position), droppedItemType, 1, '#ef4444');
-                                   dropsText.push(`a ${droppedItemType}`);
-                               }
-                               
-                               if (Math.random() < 0.2 || enemyType === 'boss') {
-                                   const goldRange = ENEMY_GOLD[enemyType] || ENEMY_GOLD.zombie;
-                                   const goldAmount = goldRange[0] + Math.floor(Math.random() * (goldRange[1] - goldRange[0] + 1));
-                                   onGoldGain(goldAmount);
-                                   dropsText.push(`${goldAmount} gold`);
-                               }
+                                   if (type.includes('chicken')) { meatType = 'chicken_meat'; color = '#fcd5ce'; count = 2; } // 2 legs
+                                   if (type.includes('cow')) { meatType = 'beef_meat'; color = '#AA4A44'; count = 2; }
+                                   if (type.includes('pig')) { meatType = 'pork_meat'; color = '#ffcad4'; count = 2; }
+                                   if (type.includes('sheep')) { meatType = 'mutton_meat'; color = '#c08081'; count = 1; }
+                                   if (type.includes('fish')) { meatType = 'fish_meat'; color = '#ff6b35'; count = 1; }
 
-                               if (dropsText.length > 0) {
-                                   dropMsg = `The ${c.name} dropped ${dropsText.join(' and ')}`;
-                               }
-                               
-                               // Notification
-                               if (dropMsg) onNotification(dropMsg, 'MERCHANT'); 
-                               else onNotification(`You killed ${c.name}`, 'MERCHANT');
+                                   spawnDrop(new THREE.Vector3(...c.position), meatType, count, color);
+                                   dropsText.push(`${count} ${meatType.replace('_meat', '')}`);
+                                } 
+                                // Enemy Drops
+                                else if (c.isEnemy) {
+                                   const drops = ['meat', 'apple', 'wood', 'stone'];
+                                   if (Math.random() < 0.5) {
+                                       const droppedItemType = drops[Math.floor(Math.random() * drops.length)];
+                                       spawnDrop(new THREE.Vector3(...c.position), droppedItemType, 1, '#ef4444');
+                                       dropsText.push(`a ${droppedItemType}`);
+                                   }
+                                   
+                                   if (Math.random() < 0.2 || enemyType === 'boss') {
+                                       const goldRange = ENEMY_GOLD[enemyType] || ENEMY_GOLD.zombie;
+                                       const goldAmount = goldRange[0] + Math.floor(Math.random() * (goldRange[1] - goldRange[0] + 1));
+                                       onGoldGain(goldAmount);
+                                       dropsText.push(`${goldAmount} gold`);
+                                       
+                                       // Boss / Giant Armor Drop Chance
+                                       if ((enemyType === 'boss' || enemyType === 'giant') && Math.random() < 0.3) {
+                                            spawnDrop(new THREE.Vector3(...c.position), 'iron_armor', 1, '#9ca3af');
+                                            dropsText.push('Iron Armor');
+                                       }
+                                   }
+                                }
+
+                                if (dropsText.length > 0) {
+                                    dropMsg = `The ${c.name} dropped ${dropsText.join(' and ')}`;
+                                }
+                                
+                                if (dropMsg) onNotification(dropMsg, 'MERCHANT'); 
+                                else if (c.isEnemy) onNotification(`You killed ${c.name}`, 'MERCHANT');
                             }
                         } else {
                             try { 
                                 audioManager.playSFX('PUNCH_HIT');
                                 if (c.name.toLowerCase().includes('zombie')) audioManager.playSFX('ZOMBIE_HIT');
+                                else if (isAnimal) audioManager.playSFX('ANIMAL_HURT'); // Placeholder if you have it, else PUNCH_HIT works
                             } catch (e) {}
+                            
                             // Enemy Knockback
                             const camPos = camera.position.clone(); 
-                            // Player position is camera position (approx in FP) or from ref
-                            // Logic: Push AWAY from player
                             const enemyPos = new THREE.Vector3(...c.position);
                             const pushDir = enemyPos.clone().sub(camPos).normalize();
-                            pushDir.y = 0; // Keep horizontal push mostly
+                            pushDir.y = 0; 
                             
                             // Move 1 block
                             c.position = [
@@ -200,8 +221,11 @@ export const useCombat = ({
                                 c.position[1],
                                 c.position[2] + pushDir.z * 1
                             ] as [number, number, number];
+                            
+                            // Trigger Fleeing
+                            c.lastDamagedTime = Date.now();
                         }
-                        return { ...c, hp: newHp };
+                        return { ...c, hp: newHp, lastDamagedTime: Date.now() };
                     }
                     return c;
                 }).filter(c => c.hp > 0);

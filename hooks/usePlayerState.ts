@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { InventoryItem } from '../types';
+import { InventoryItem, Equipment, EquipmentSlot } from '../types';
 import { audioManager } from '../utils/audio';
 
 export const usePlayerState = (gameStarted: boolean) => {
@@ -98,6 +98,105 @@ export const usePlayerState = (gameStarted: boolean) => {
     }
   }, []); // Logic inside setInventory doesn't need inventory dependency if using usage of prev correctly, but findIndex needs it? No, findIndex on prev is safe.
 
+  const [equipment, setEquipment] = useState<Equipment>({
+    head: null, chest: null, feet: null, mainHand: null, offHand: null
+  });
+
+  const equipFromInventory = useCallback((inventoryIndex: number, slot: EquipmentSlot) => {
+    setInventory(prev => {
+        const item = prev[inventoryIndex];
+        if (!item) return prev;
+        
+        // Take 1
+        const newInv = [...prev];
+        if (item.count > 1) {
+            newInv[inventoryIndex] = { ...item, count: item.count - 1 };
+        } else {
+            newInv.splice(inventoryIndex, 1);
+        }
+
+        setEquipment(prevEq => {
+            const currentEquip = prevEq[slot];
+            if (currentEquip) {
+                // Add back to inventory (simplified: push to end)
+                // In a real app we would try to stack, but strict push is safe for now
+                // Actually we can try to find stack
+                const stackIdx = newInv.findIndex(i => i.type === currentEquip.type);
+                if (stackIdx >= 0) newInv[stackIdx] = { ...newInv[stackIdx], count: newInv[stackIdx].count + 1 };
+                else newInv.push(currentEquip);
+            }
+            return { ...prevEq, [slot]: { ...item, count: 1 } };
+        });
+
+        return newInv;
+    });
+    // Sound Effect
+    try { audioManager.playSFX('DRAW_SWORD'); } catch(e) {}
+  }, []);
+
+  const unequipItem = useCallback((slot: EquipmentSlot) => {
+      setEquipment(prevEq => {
+          const item = prevEq[slot];
+          if (!item) return prevEq;
+          
+          setInventory(prevInv => {
+              const newInv = [...prevInv];
+              const stackIdx = newInv.findIndex(i => i.type === item.type);
+              if (stackIdx >= 0) newInv[stackIdx] = { ...newInv[stackIdx], count: newInv[stackIdx].count + 1 };
+              else newInv.push(item);
+              return newInv;
+          });
+          
+          return { ...prevEq, [slot]: null };
+      });
+  }, []);
+
+  const eatItem = useCallback((slotIndex: number) => {
+      let consumed = false;
+      setInventory(prev => {
+          const item = prev[slotIndex];
+          if (!item) return prev;
+          
+          const type = item.type;
+          let isEdible = false;
+          
+          if (type === 'apple' || type.includes('meat') || type.includes('fish') || type === 'bread') {
+              isEdible = true;
+          }
+          
+          if (isEdible) {
+              consumed = true;
+              // Remove 1 item
+              const newInv = [...prev];
+              if (item.count > 1) {
+                  newInv[slotIndex] = { ...item, count: item.count - 1 };
+              } else {
+                  newInv.splice(slotIndex, 1);
+              }
+              return newInv;
+          }
+          
+          return prev;
+      });
+
+      if (consumed) {
+          // Play Sound & Restore Stats (outside setState to be safe with closure)
+          // We can check type again from current inventory state? 
+          // Actually we know it was edible.
+          // Since we rely on setInventory for atomic update, we should calculate stat boost here.
+          // But we don't have the item type easily accessible outside without reading inventory[slotIndex].
+          // Let's assume generic food or read type from inventory first.
+          // Better: do stat update in a separate effect? No.
+          // Better: Just set stats blindly? Or use logic.
+          // Let's assume apple/meat logic.
+          setPlayerHunger(h => Math.min(100, h + 15));
+          setPlayerHp(h => Math.min(100, h + 10));
+          try { audioManager.playSFX('EAT'); } catch (e) {}
+          return true;
+      }
+      return false;
+  }, []);
+
   return {
     playerHp, setPlayerHp,
     playerHunger, setPlayerHunger,
@@ -110,6 +209,8 @@ export const usePlayerState = (gameStarted: boolean) => {
     playerXp, playerLevel, playerGold,
     levelUpMessage, onXpGain, onGoldGain,
     playerStats, XP_THRESHOLDS,
-    craftItem
+    craftItem,
+    equipment, setEquipment, equipFromInventory, unequipItem,
+    eatItem
   };
 };

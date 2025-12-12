@@ -13,13 +13,24 @@ export const useWorldState = (gameStarted: boolean) => {
   // Portal State
   const [portalActive, setPortalActive] = useState(false);
   const [portalPosition, setPortalPosition] = useState<[number, number, number] | null>(null);
+  const [portalColor, setPortalColor] = useState<string>('#a855f7'); // Default purple
   const [isUnderworld, setIsUnderworld] = useState(false);
   const [worldLevel, setWorldLevel] = useState(1);
 
   const BASE_SIZE = 40;
   const EXPANSION_STEP = 20;
 
-
+  // Portal Variants
+  const PORTAL_VARIANTS = [
+      { color: '#a855f7', name: 'Purple' },
+      { color: '#f97316', name: 'Orange' },
+      { color: '#3b82f6', name: 'Blue' },
+      { color: '#7f1d1d', name: 'Dark Red' },
+      { color: '#ec4899', name: 'Pink' },
+      { color: '#22c55e', name: 'Green' },
+      { color: '#e2e8f0', name: 'Silver' },
+      { color: '#000000', name: 'Void' }, // Black with white sparkles
+  ];
 
   // Rain Cycle
   useEffect(() => {
@@ -41,15 +52,21 @@ export const useWorldState = (gameStarted: boolean) => {
       const range = BASE_SIZE + (expansionLevel * EXPANSION_STEP);
       const px = Math.floor(Math.random() * range * 2) - range;
       const pz = Math.floor(Math.random() * range * 2) - range;
+      
+      // Select Random Variant
+      const variant = PORTAL_VARIANTS[Math.floor(Math.random() * PORTAL_VARIANTS.length)];
+      setPortalColor(variant.color);
+
       setPortalPosition([px, 5, pz]);
       setPortalActive(true);
-      // Blocks for portal need to be added. We will expose a helper or let the effect handle it if we have setBlocks
+      
+      // Blocks for portal
        const portalBlocks = structurePrefabs.portal.blocks.map(b => ({
         id: uuidv4(),
         x: b.x + px,
         y: b.y + 1,
         z: b.z + pz,
-        color: b.color,
+        color: b.type === 'portal' ? variant.color : b.color, // Apply variant color only to inner portal blocks
         type: b.type
       }));
       setBlocks(prev => [...prev, ...portalBlocks]);
@@ -73,6 +90,20 @@ export const useWorldState = (gameStarted: boolean) => {
     setExpansionLevel(newLevel);
   }, [expansionLevel]);
 
+  const enterUnderworld = useCallback(() => {
+     setIsUnderworld(true);
+     setWorldLevel(2);
+     setPortalActive(false); 
+     setPortalPosition(null);
+
+     import('../utils/procedural').then(({ generateUnderworldTerrain }) => {
+         const { blocks: newBlocks } = generateUnderworldTerrain();
+         setBlocks(newBlocks);
+         setIsDay(false);
+         setIsRaining(false);
+     });
+  }, []);
+
   return {
     blocks, setBlocks,
     isDay, setIsDay,
@@ -80,9 +111,11 @@ export const useWorldState = (gameStarted: boolean) => {
     expansionLevel, setExpansionLevel,
     portalActive, setPortalActive,
     portalPosition, setPortalPosition,
+    portalColor, // Export color
     isUnderworld, setIsUnderworld,
     worldLevel, setWorldLevel,
     handleExpand, handleShrink,
+    enterUnderworld,
     BASE_SIZE, EXPANSION_STEP
   };
 };

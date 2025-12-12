@@ -4,7 +4,7 @@ import { StartControlsPanel } from './ui/start/StartControlsPanel';
 import { loadGame } from '../utils/storage';
 
 interface StartScreenProps {
-  onStart: () => void;
+  onStart: (mode: 'CREATIVE' | 'ADVENTURE') => void;
   onContinue: () => void;
 }
 

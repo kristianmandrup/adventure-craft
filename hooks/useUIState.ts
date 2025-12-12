@@ -1,15 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 
+import { InventoryItem } from '../types';
+
 interface UseUIStateProps {
   onReset: () => void;
   onRespawn: () => void;
   onExpand: () => void;
   onResetView: () => void;
   setActiveSlot: (slot: number) => void;
+  inventory: InventoryItem[];
+  activeSlot: number;
+  onEat: (slot: number) => void;
 }
 
-export const useUIState = ({ onReset, onRespawn, onExpand, onResetView, setActiveSlot }: UseUIStateProps) => {
+export const useUIState = ({ onReset, onRespawn, onExpand, onResetView, setActiveSlot, inventory, activeSlot, onEat }: UseUIStateProps) => {
   const [showCrafting, setShowCrafting] = useState(false);
+  const [showEquipment, setShowEquipment] = useState(false);
   const [tooltip, setTooltip] = useState<{text: string, x: number, y: number} | null>(null);
   const [generationCount, setGenerationCount] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +32,14 @@ export const useUIState = ({ onReset, onRespawn, onExpand, onResetView, setActiv
       e.nativeEvent.stopImmediatePropagation();
   };
 
-  const toggleCrafting = () => setShowCrafting(prev => !prev);
+  const toggleCrafting = () => {
+      setShowCrafting(prev => !prev);
+      setShowEquipment(false);
+  };
+  const toggleEquipment = () => {
+      setShowEquipment(prev => !prev);
+      setShowCrafting(false);
+  }
 
   // Global Key Shortcuts
   useEffect(() => {
@@ -47,17 +60,28 @@ export const useUIState = ({ onReset, onRespawn, onExpand, onResetView, setActiv
         case 'r': onRespawn(); break;
         case 'm': onExpand(); break;
         case 'h': onResetView(); break;
-        case 'c': setShowCrafting(prev => !prev); break;
+        case 'c': toggleCrafting(); break;
+        case 'e': 
+            const item = inventory[activeSlot];
+            if (item && (item.type === 'apple' || item.type.includes('meat') || item.type.includes('fish') || item.type === 'bread')) {
+                onEat(activeSlot);
+            } else {
+                toggleEquipment(); 
+            }
+            break;
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [onReset, onRespawn, onExpand, onResetView, setActiveSlot]);
+  }, [onReset, onRespawn, onExpand, onResetView, setActiveSlot, inventory, activeSlot, onEat]); // Warning: update deps
 
   return {
     showCrafting,
     setShowCrafting,
     toggleCrafting,
+    showEquipment,
+    setShowEquipment,
+    toggleEquipment,
     tooltip,
     showTooltip,
     hideTooltip,

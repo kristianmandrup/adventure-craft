@@ -9,10 +9,11 @@ interface UseMiningProps {
     setDroppedItems: React.Dispatch<React.SetStateAction<import('../../types').DroppedItem[]>>;
     onQuestUpdate: (type: string, amount: number) => void;
     onNotification: (message: string, type: import('../../types').NotificationType, subMessage?: string) => void;
+    onSpawnParticles: (pos: THREE.Vector3, color: string) => void;
 }
 
 export const useMining = ({
-    setBlocks, inventory, setDroppedItems, onQuestUpdate, onNotification
+    setBlocks, inventory, setDroppedItems, onQuestUpdate, onNotification, onSpawnParticles
 }: UseMiningProps) => {
 
     const spawnDrop = (position: THREE.Vector3, type: string, count: number, color: string) => {
@@ -32,9 +33,19 @@ export const useMining = ({
                     const damage = hasAxe ? 10 : 2; 
                     const newHp = (blk.hp || 1) - damage; 
                     
+                    // Spawn Particles (Always on hit)
+                    onSpawnParticles(new THREE.Vector3(block.x, block.y, block.z), block.color);
+
                     if (newHp <= 0) {
                         onQuestUpdate(block.type || 'dirt', 1);
                         spawnDrop(new THREE.Vector3(block.x, block.y, block.z), block.type || 'dirt', 1, block.color);
+                        
+                        // Rare Chance for Treasure in Gold Blocks
+                        if (block.type === 'gold' && Math.random() < 0.05) {
+                             spawnDrop(new THREE.Vector3(block.x, block.y + 0.5, block.z), 'iron_armor', 1, '#9ca3af');
+                             onNotification('You found Iron Armor inside the gold!', 'success');
+                        }
+
                         try { 
                             if (block.type?.includes('wood') || block.type?.includes('log') || block.type?.includes('plank')) {
                                 audioManager.playSFX('CHOP_WOOD');

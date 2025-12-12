@@ -350,5 +350,5 @@ export const usePlayerPhysics = ({
       velocity.current.add(force);
   };
 
-  return { isLocked, camAngle, debugInfo, applyKnockback };
+  return { isLocked, camAngle, debugInfo, applyKnockback, velocityRef: velocity };
 };

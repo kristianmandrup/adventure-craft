@@ -9,6 +9,7 @@ import { GenerationInput } from './ui/GenerationInput';
 import { CraftingMenu } from './ui/CraftingMenu';
 import { JobQueue } from './ui/JobQueue';
 import { QuestDisplay } from './ui/QuestDisplay';
+import { EquipmentMenu } from './ui/EquipmentMenu';
 
 interface UIOverlayProps {
   onGenerate: (type: GenerationMode, prompt: string, count: number, isEnemy?: boolean, isGiant?: boolean, isFriendly?: boolean, isAquatic?: boolean) => void;
@@ -37,17 +38,26 @@ interface UIOverlayProps {
   levelUpMessage: string | null;
   playerGold: number;
   hasApiKey: boolean;
+  equipment: import('../types').Equipment;
+  onEquip: (index: number, slot: import('../types').EquipmentSlot) => void;
+  onUnequip: (slot: import('../types').EquipmentSlot) => void;
+  onEat: (slotIndex: number) => void;
+  gameMode: 'CREATIVE' | 'ADVENTURE';
 }
 
 
 export const UIOverlay: React.FC<UIOverlayProps> = ({ 
   onGenerate, onSpawnPredefinedCharacter, onSpawnPredefinedStructure, onReset, onExpand, onShrink, onGiveItem, onRespawn, onResetView, jobs, playerHp, playerHunger, inventory, activeSlot, setActiveSlot, onCraft, expansionLevel, viewMode = 'FP', quest, questMessage,
-  playerXp, playerLevel, xpThresholds, levelUpMessage, playerGold, hasApiKey
+  playerXp, playerLevel, xpThresholds, levelUpMessage, playerGold, hasApiKey,
+  equipment, onEquip, onUnequip, onEat
 }) => {
   const {
       showCrafting,
       setShowCrafting,
       toggleCrafting,
+      showEquipment,
+      setShowEquipment,
+      toggleEquipment,
       tooltip,
       showTooltip,
       hideTooltip,
@@ -55,12 +65,13 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
       setGenerationCount,
       inputRef,
       stopProp
-  } = useUIState({ onReset, onRespawn, onExpand, onResetView, setActiveSlot });
+  } = useUIState({ onReset, onRespawn, onExpand, onResetView, setActiveSlot, inventory, activeSlot, onEat });
 
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
       
+      {/* ... Tooltips ... */}
       {tooltip && (
         <div 
             className="fixed z-100 px-3 py-1.5 bg-black/90 text-white text-xs font-semibold rounded-lg shadow-xl border border-white/20 whitespace-nowrap pointer-events-none transition-opacity duration-200"
@@ -111,11 +122,33 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
         levelUpMessage={levelUpMessage}
         playerGold={playerGold}
       />
+      
+      {/* Equipment Button (Temporary location or inside TopBar? I'll add a floating button or key hint) */}
+      <div className="absolute top-24 right-6 pointer-events-auto flex flex-col gap-2">
+         <button 
+           onClick={toggleEquipment}
+           className="bg-slate-800 text-white p-2 rounded border border-slate-600 hover:bg-slate-700 active:scale-95 transition-all shadow-lg"
+           title="Equipment (E)"
+         >
+           🛡️ Equipment
+         </button>
+      </div>
 
       <QuestDisplay quest={quest} questMessage={questMessage} />
 
       {showCrafting && (
         <CraftingMenu onCraft={onCraft} onClose={() => setShowCrafting(false)} stopProp={stopProp} />
+      )}
+      
+      {showEquipment && (
+          // Dynamic Import to avoid cycle? No.
+          <EquipmentMenu 
+            equipment={equipment} 
+            inventory={inventory} 
+            onEquip={onEquip} 
+            onUnequip={onUnequip} 
+            onClose={() => setShowEquipment(false)} 
+          />
       )}
 
       <JobQueue jobs={jobs} />

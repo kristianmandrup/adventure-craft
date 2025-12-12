@@ -28,11 +28,12 @@ interface UsePlayerInteractionProps {
   camera?: THREE.Object3D;
   setDroppedItems: React.Dispatch<React.SetStateAction<import('../types').DroppedItem[]>>;
   onNotification: (message: string, type: import('../types').NotificationType, subMessage?: string) => void;
+  onSpawnParticles: (pos: THREE.Vector3, color: string) => void;
 }
 
 export const usePlayerInteraction = ({
   blockMap, positionRef, inventory, setInventory, activeSlot, setBlocks, setCharacters, setPlayerHunger, viewMode, isLocked, targetPosRef, characters, onQuestUpdate,
-  setProjectiles, playerStats, onXpGain, onGoldGain, setDroppedItems, onNotification
+  setProjectiles, playerStats, onXpGain, onGoldGain, setDroppedItems, onNotification, onSpawnParticles
 }: UsePlayerInteractionProps) => {
   const { camera, raycaster, pointer } = useThree();
   const [cursorPos, setCursorPos] = useState<[number, number, number] | null>(null);
@@ -41,11 +42,11 @@ export const usePlayerInteraction = ({
 
   // Sub-Hooks
   const { handleAttack } = useCombat({
-      characters, setCharacters, setProjectiles, inventory, setInventory, playerStats, onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems
+      characters, setCharacters, setProjectiles, inventory, setInventory, playerStats, onQuestUpdate, onXpGain, onGoldGain, onNotification, setDroppedItems, onSpawnParticles
   });
 
   const { handleMining } = useMining({
-      setBlocks, inventory, setDroppedItems, onQuestUpdate, onNotification
+      setBlocks, inventory, setDroppedItems, onQuestUpdate, onNotification, onSpawnParticles
   });
 
   const { handleInteraction: handlePlace } = usePlacement({

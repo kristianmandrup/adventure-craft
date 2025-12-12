@@ -1,23 +1,6 @@
-import { Block, Character, InventoryItem, Projectile, DroppedItem, Quest } from '../types';
+import { Block, Character, InventoryItem, Projectile, DroppedItem, Quest, GameSaveState } from '../types';
 
-export interface GameSaveState {
-    playerHp: number;
-    playerHunger: number;
-    playerXp: number;
-    playerLevel: number;
-    playerGold: number;
-    inventory: InventoryItem[];
-    blocks: Block[];
-    characters: Character[];
-    droppedItems: DroppedItem[];
-    currentQuest: Quest | null;
-    questMessage: string | null;
-    gameStarted: boolean;
-    isDay: boolean;
-    expansionLevel: number;
-    timestamp: number;
-    playerPos: [number, number, number];
-}
+// Removed local GameSaveState interface
 
 export interface ScoreEntry {
     name: string;
