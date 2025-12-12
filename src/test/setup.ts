@@ -16,6 +16,7 @@ vi.mock('../utils/audio', () => ({
         playSpatialSFX: vi.fn(),
         setMusicVolume: vi.fn(),
         setSFXVolume: vi.fn(),
+        speak: vi.fn(),
     },
 }));
 

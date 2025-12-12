@@ -15,8 +15,9 @@ describe('friendlyBehavior', () => {
       isEnemy: false,
       isMoving: false,
       rotation: 0,
-      health: 20,
-      maxHealth: 20,
+      parts: [],
+      hp: 20,
+      maxHp: 20,
     } as Character;
   });
 
@@ -71,29 +72,37 @@ describe('friendlyBehavior', () => {
 
   describe('Idle behavior', () => {
     it('should occasionally wander when idle', () => {
-      // With low probability wander, run many times
-      let movedCount = 0;
-      for (let i = 0; i < 1000; i++) {
-        const result = updateFriendlyCharacter(baseChar, playerPos);
-        if (result.isMoving) movedCount++;
-      }
+      // Mock random to trigger movement (chance is usually 0.005)
+      const randomSpy = vi.spyOn(Math, 'random');
       
-      // Should move occasionally (0.5% chance)
-      expect(movedCount).toBeGreaterThan(0);
-      expect(movedCount).toBeLessThan(100); // But not too often
+      // Force movement: random < 0.005
+      randomSpy.mockReturnValue(0.001);
+      
+      const result = updateFriendlyCharacter(baseChar, playerPos);
+      
+      expect(result.isMoving).toBe(true);
+      
+      randomSpy.mockRestore();
     });
 
     it('should occasionally change rotation when idle', () => {
-      let rotationChanged = false;
-      for (let i = 0; i < 1000; i++) {
-        const result = updateFriendlyCharacter(baseChar, playerPos);
-        if (result.rotation !== 0) {
-          rotationChanged = true;
-          break;
-        }
-      }
+      const randomSpy = vi.spyOn(Math, 'random');
+          
+      // Sequence:
+      // 1. Rotation check (< 0.01) -> 0.005 (True)
+      // 2. Rotation value -> 0.8
+      // 3. Movement check -> 0.5 (False)
+      randomSpy
+        .mockReturnValueOnce(0.005)
+        .mockReturnValueOnce(0.8)
+        .mockReturnValueOnce(0.5);
       
-      expect(rotationChanged).toBe(true);
+      const result = updateFriendlyCharacter(baseChar, playerPos);
+      
+      expect(result.rotation).not.toBe(0);
+      expect(result.rotation).toBeCloseTo(0 + (0.8 - 0.5));
+      
+      randomSpy.mockRestore();
     });
   });
 
@@ -111,7 +120,7 @@ describe('friendlyBehavior', () => {
       
       expect(result.id).toBe(baseChar.id);
       expect(result.name).toBe(baseChar.name);
-      expect(result.health).toBe(baseChar.health);
+      expect(result.hp).toBe(baseChar.hp);
     });
   });
 });

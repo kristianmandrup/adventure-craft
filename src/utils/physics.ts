@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Block } from '../types';
 
-import { PHYSICS, PLAYER } from '../src/constants';
+import { PHYSICS, PLAYER } from '../constants';
 
 export const GRAVITY = PHYSICS.GRAVITY;
 export const JUMP_FORCE = PHYSICS.JUMP_FORCE;

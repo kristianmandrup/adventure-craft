@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Character, Projectile, SpawnMarker } from '../types';
 import * as THREE from 'three';
-import { getItemColor } from '../src/colors';
-import { ENTITIES } from '../src/constants';
+import { getItemColor } from '../colors';
+import { ENTITIES } from '../constants';
 
 export const useEntityState = (gameStarted: boolean, isUnderworld: boolean) => {
   const [characters, setCharacters] = useState<Character[]>([]);

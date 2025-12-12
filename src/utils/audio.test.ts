@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { audioManager } from './audio';
 
+vi.unmock('./audio');
+
 // Mock Sound Assets to ensure we have something to test with
 vi.mock('./sound-assets', () => ({
   SOUND_ASSETS: {
