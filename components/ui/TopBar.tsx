@@ -70,19 +70,25 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="text-white font-mono text-sm">{Math.round(playerHunger)}</span>
          </div>
 
-         {/* XP Bar */}
+         {/* XP Bar & Score */}
          <div className="bg-black/60 p-2 rounded-lg backdrop-blur-md flex items-center gap-2 w-64 border border-white/10"
-              onMouseEnter={(e) => showTooltip(e, `Level ${playerLevel} - ${playerXp} XP`)} onMouseLeave={hideTooltip}>
-            <div className="flex items-center justify-center w-6 h-6 bg-yellow-500 rounded-full text-black font-bold text-xs">
+              onMouseEnter={(e) => showTooltip(e, `Level ${playerLevel} - Total Score: ${playerXp}`)} onMouseLeave={hideTooltip}>
+            <div className="flex items-center justify-center w-8 h-8 bg-yellow-500 rounded-full text-black font-bold text-sm shadow-[0_0_10px_rgba(234,179,8,0.5)]">
               {playerLevel}
             </div>
-            <div className="flex-1 h-3 bg-purple-900 rounded-full overflow-hidden">
-              <div 
-                 className="h-full bg-linear-to-r from-purple-500 to-yellow-400 transition-all duration-300"
-                 style={{ width: `${Math.max(0, Math.min(100, xpProgress))}%` }}
-              />
+            <div className="flex-1 flex flex-col gap-1">
+                <div className="flex justify-between items-center text-[10px] text-yellow-200 font-mono leading-none">
+                    <span>LVL</span>
+                    <span className="font-bold text-yellow-400">SCORE: {playerXp}</span>
+                </div>
+                <div className="h-2 bg-purple-900 rounded-full overflow-hidden">
+                  <div 
+                     className="h-full bg-linear-to-r from-purple-500 to-yellow-400 transition-all duration-300 shadow-[0_0_8px_rgba(168,85,247,0.6)]"
+                     style={{ width: `${Math.max(0, Math.min(100, xpProgress))}%` }}
+                  />
+                </div>
             </div>
-            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+            <Star className="w-5 h-5 text-yellow-400 fill-yellow-400 drop-shadow-md" />
          </div>
 
          {/* Gold Counter */}

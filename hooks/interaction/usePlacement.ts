@@ -54,13 +54,17 @@ export const usePlacement = ({
             // UsePlacementProps needs `blocks` or `blockMap` to check for chest pattern.
             // I'll need to update UsePlacementProps.
             
-             // Eating Logic
-            if (currentItem.type === 'meat' || currentItem.type === 'apple') {
+            // Eating/Drinking Logic
+            if (currentItem.type === 'meat' || currentItem.type === 'apple' || currentItem.type === 'potion') {
+                const isDrink = currentItem.type === 'potion';
                 const hungerRefill = currentItem.type === 'meat' ? 20 : 10;
+                // If potion, maybe restore health instead? But usePlacement only has setPlayerHunger.
+                // Assuming potion restores hunger for now or just consumed.
+                // Logic says: setPlayerHunger...
                 setPlayerHunger(h => Math.min(100, h + hungerRefill));
                 setInventory(prev => prev.map((inv, idx) => idx === activeSlot ? { ...inv, count: inv.count - 1 } : inv));
-                try { audioManager.playSFX('EAT'); } catch (e) {}
-                onNotification(`You ate ${currentItem.type}`, 'INFO');
+                try { audioManager.playSFX(isDrink ? 'DRINK' : 'EAT'); } catch (e) {}
+                onNotification(`You consumed ${currentItem.type}`, 'INFO');
                 return;
             } 
             

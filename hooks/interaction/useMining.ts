@@ -35,11 +35,23 @@ export const useMining = ({
                     if (newHp <= 0) {
                         onQuestUpdate(block.type || 'dirt', 1);
                         spawnDrop(new THREE.Vector3(block.x, block.y, block.z), block.type || 'dirt', 1, block.color);
-                        try { audioManager.playSFX('BLOCK'); } catch (e) {}
+                        try { 
+                            if (block.type?.includes('wood') || block.type?.includes('log') || block.type?.includes('plank')) {
+                                audioManager.playSFX('CHOP_WOOD');
+                            } else {
+                                audioManager.playSFX('MINE'); 
+                            }
+                        } catch (e) {}
                         onNotification(`You mined 1 ${block.type || 'dirt'}`, 'INFO');
                         return false; 
                     } else {
-                        try { audioManager.playSFX('BLOCK'); } catch (e) {}
+                        try { 
+                            if (block.type?.includes('wood') || block.type?.includes('log') || block.type?.includes('plank')) {
+                                audioManager.playSFX('CHOP_WOOD');
+                            } else {
+                                audioManager.playSFX('MINE'); 
+                            }
+                        } catch (e) {}
                         return true; 
                     }
                 }

@@ -35,7 +35,13 @@ const handleSoundEvents = (char: Character, soundEvent: string, playerPos: THREE
             case 'SORCERER_SPELL': audioManager.playSFX('SORCERER_SPELL', volumeFactor); break;
             case 'SORCERER_CHANT': audioManager.playSFX('SORCERER_CHANT', volumeFactor); break;
             case 'SUMMON': audioManager.playSFX('SUMMON', volumeFactor); break;
-            case 'ZOMBIE_ATTACK': audioManager.playSFX('ZOMBIE_ATTACK', Math.max(0, 1 - dist / 20)); break;
+            case 'ZOMBIE_ATTACK': 
+                if (char.name.includes('Giant') || char.name.includes('Ogre')) {
+                    audioManager.playSFX('GIANT_ATTACK', Math.max(0, 1 - dist / 35));
+                } else {
+                    audioManager.playSFX('ZOMBIE_ATTACK', Math.max(0, 1 - dist / 20));
+                }
+                break;
         }
     } catch (e) {
         // Ignore audio errors
@@ -50,6 +56,7 @@ const handleRandomCreatureEffects = (char: Character, playerPos: THREE.Vector3) 
         if (char.name.includes('Zombie')) audioManager.playSFX('ZOMBIE_GROAN', Math.max(0.1, 1 - dist / 20));
         if (char.name.includes('Sorcerer')) audioManager.playSFX('SORCERER_LAUGH', Math.max(0.1, 1 - dist / 30));
         if (char.name.includes('Giant')) audioManager.playSFX('GIANT_WALK', Math.max(0.2, 1 - dist / 40));
+        if (char.name.includes('Ogre')) audioManager.playSFX('OGRE_ROAR', Math.max(0.2, 1 - dist / 40));
     }
 };
 

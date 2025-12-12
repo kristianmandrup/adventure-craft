@@ -46,6 +46,18 @@ export const useAmbiance = (
                  audioManager.playSFX('LAKE', 0.4);
              }
         }
+        
+        // Cave / Underground Ambiance
+        if (py < -5) {
+             if (Math.random() < 0.05) {
+                 audioManager.playSFX('CREEPY', 0.6);
+             }
+        }
+        
+        // General Ominous Ambiance
+        if (Math.random() < 0.01) {
+             audioManager.playSFX('OMINOUS', 0.5);
+        }
     };
 
     lakeInterval.current = setInterval(checkAmbiance, 3000);

@@ -87,9 +87,21 @@ export const useCombat = ({
         }
 
         // Melee Logic
-        if (currentItem?.type === 'weapon' || currentItem?.type.includes('axe') || currentItem?.type.includes('pick')) {
-             const isHeavy = currentItem.type === 'weapon' && Math.random() < 0.3; 
-             try { audioManager.playSFX(isHeavy ? 'ATTACK_HEAVY' : 'ATTACK_SWORD'); } catch (e) {}
+        const isWeapon = currentItem?.type === 'weapon' || currentItem?.type.includes('axe') || currentItem?.type.includes('pick');
+        
+        if (isWeapon) {
+             const isHeavy = currentItem.type === 'weapon' && Math.random() < 0.3;
+             const isAxe = currentItem.type.includes('axe');
+             try { 
+                 if (isAxe) {
+                    audioManager.playSFX('ATTACK_AXE');
+                 } else {
+                    audioManager.playSFX(isHeavy ? 'ATTACK_HEAVY' : 'ATTACK_SWORD'); 
+                 }
+             } catch (e) {}
+        } else {
+            // Unarmed / Punch
+             try { audioManager.playSFX('PUNCH'); } catch (e) {}
         }
 
         // Hit Detection
@@ -170,7 +182,10 @@ export const useCombat = ({
                                else onNotification(`You killed ${c.name}`, 'MERCHANT');
                             }
                         } else {
-                            try { audioManager.playSFX('ZOMBIE_HIT'); } catch (e) {}
+                            try { 
+                                audioManager.playSFX('PUNCH_HIT');
+                                if (c.name.toLowerCase().includes('zombie')) audioManager.playSFX('ZOMBIE_HIT');
+                            } catch (e) {}
                             // Enemy Knockback
                             const camPos = camera.position.clone(); 
                             // Player position is camera position (approx in FP) or from ref
